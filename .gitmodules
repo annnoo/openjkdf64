@@ -48,3 +48,7 @@
 	url = https://github.com/libsdl-org/SDL_mixer.git
 	branch = release-2.6.3
 	shallow = true
+[submodule "libdragon"]
+	path = libdragon
+	url = https://github.com/DragonMinded/libdragon
+	branch = preview

@@ -121,4 +121,4 @@ nintendo-dsi-shareware-demo/*
 build_openjkdf2_venv/*
 .beads/
 graphify-out/
-AGENTS.md
+AGENTS.md.worktrees/
