@@ -1,0 +1,47 @@
+import struct
+import os
+import sys
+from pathlib import Path
+
+def extract(gob_path, out_dir):
+    with open(gob_path, 'rb') as f:
+        # Header
+        data = f.read(12)
+        if len(data) < 12:
+            raise ValueError("File too small for GOB header")
+            
+        magic, version, table_off = struct.unpack('<4sII', data)
+        if magic != b'GOB ' and magic != b'GOO ':
+            raise ValueError(f"Invalid magic: {magic}")
+        
+        # Seek to index
+        f.seek(table_off)
+        num_files_data = f.read(4)
+        if not num_files_data:
+            raise ValueError("Failed to read number of files at table offset")
+        num_files = struct.unpack('<I', num_files_data)[0]
+        
+        entries = []
+        for _ in range(num_files):
+            entry_data = f.read(136)
+            if len(entry_data) < 136:
+                break
+            off, size, name_raw = struct.unpack('<II128s', entry_data)
+            # Split at first null byte and decode
+            name = name_raw.split(b'\0')[0].decode('ascii').replace('\\', '/')
+            entries.append((off, size, name))
+            
+        # Extract
+        for off, size, name in entries:
+            target = Path(out_dir) / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            f.seek(off)
+            with open(target, 'wb') as out:
+                out.write(f.read(size))
+            print(f"Extracted: {name}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: extract_gob.py <file.gob> <out_dir>")
+        sys.exit(1)
+    extract(sys.argv[1], sys.argv[2])
