@@ -3,6 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+import argparse
+
 def extract(gob_path, out_dir):
     with open(gob_path, 'rb') as f:
         # Header
@@ -40,8 +42,17 @@ def extract(gob_path, out_dir):
                 out.write(f.read(size))
             print(f"Extracted: {name}")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: extract_gob.py <file.gob> <out_dir>")
+def main():
+    parser = argparse.ArgumentParser(description='Extract Jedi Knight GOB/GOO files')
+    parser.add_argument('gob_path', help='Path to the GOB/GOO file')
+    parser.add_argument('out_dir', help='Directory to extract files into')
+    args = parser.parse_args()
+    
+    try:
+        extract(args.gob_path, args.out_dir)
+    except Exception as e:
+        print(f"Error: {e}")
         sys.exit(1)
-    extract(sys.argv[1], sys.argv[2])
+
+if __name__ == "__main__":
+    main()
