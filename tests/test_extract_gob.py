@@ -72,5 +72,46 @@ class TestGob(unittest.TestCase):
             if test_dir.exists():
                 shutil.rmtree(test_dir)
 
+    def test_latin1_filename(self):
+        test_dir = Path("test_out_latin1")
+        if test_dir.exists():
+            shutil.rmtree(test_dir)
+        test_dir.mkdir()
+        
+        gob_file = "test_latin1.gob"
+        
+        # Create a fake GOB with latin-1 filename
+        header = struct.pack('<4sII', b'GOB ', 20, 32)
+        file_data = b"Latin1 content"
+        num_files = 1
+        table_header = struct.pack('<I', num_files)
+        
+        # "tést.txt" in latin-1 is b't\xe9st.txt'
+        name_bytes = b"t\xe9st.txt"
+        name = name_bytes + b"\0" * (128 - len(name_bytes))
+        entry = struct.pack('<II128s', 12, len(file_data), name)
+        
+        with open(gob_file, 'wb') as f:
+            f.write(header)
+            f.write(file_data)
+            f.seek(32)
+            f.write(table_header)
+            f.write(entry)
+            
+        try:
+            extract(gob_file, str(test_dir))
+            
+            # The extracted file should have the name "tést.txt"
+            extracted_path = test_dir / "tést.txt"
+            self.assertTrue(extracted_path.exists())
+            with open(extracted_path, 'rb') as f:
+                self.assertEqual(f.read(), file_data)
+                
+        finally:
+            if os.path.exists(gob_file):
+                os.remove(gob_file)
+            if test_dir.exists():
+                shutil.rmtree(test_dir)
+
 if __name__ == '__main__':
     unittest.main()

@@ -30,16 +30,24 @@ def extract(gob_path, out_dir):
                 break
             off, size, name_raw = struct.unpack('<II128s', entry_data)
             # Split at first null byte and decode
-            name = name_raw.split(b'\0')[0].decode('ascii').replace('\\', '/')
+            name = name_raw.split(b'\0')[0].decode('latin-1').replace('\\', '/')
             entries.append((off, size, name))
             
         # Extract
+        CHUNK_SIZE = 64 * 1024
         for off, size, name in entries:
             target = Path(out_dir) / name
             target.parent.mkdir(parents=True, exist_ok=True)
             f.seek(off)
             with open(target, 'wb') as out:
-                out.write(f.read(size))
+                remaining = size
+                while remaining > 0:
+                    to_read = min(remaining, CHUNK_SIZE)
+                    chunk = f.read(to_read)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    remaining -= len(chunk)
             print(f"Extracted: {name}")
 
 def main():
