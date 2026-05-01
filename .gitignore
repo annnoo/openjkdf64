@@ -122,3 +122,4 @@ build_openjkdf2_venv/*
 .beads/
 graphify-out/
 AGENTS.md.worktrees/
+.worktrees/
