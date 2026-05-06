@@ -224,6 +224,9 @@ include(cmake_modules/config_platform_deps.cmake)
 # This includes selection for most of the files in src/platform/*
 include(cmake_modules/precompile_globals.cmake)
 
+# cogc host tool: compile all tools/out/cog/*.cog -> .bcog
+include(cmake_modules/build_cogc.cmake)
+
 #set( CMAKE_VERBOSE_MAKEFILE on )
 
 # Force CXX compilation for all files
