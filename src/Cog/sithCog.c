@@ -2,6 +2,9 @@
 
 #include "jk.h"
 #include "types.h"
+#ifndef WIN32
+#include <unistd.h>
+#endif
 #include "Devices/sithConsole.h"
 #include "Cog/sithCogFunction.h"
 #include "Cog/sithCogFunctionThing.h"
@@ -12,6 +15,7 @@
 #include "Cog/sithCogFunctionSound.h"
 #include "Cog/sithCogExec.h"
 #include "Cog/sithCogParse.h"
+#include "Cog/sithCogBinary.h"
 #include "Cog/jkCog.h"
 #include "Gameplay/sithEvent.h"
 #include "Devices/sithSound.h"
@@ -22,6 +26,7 @@
 #include "Gameplay/sithTime.h"
 #include "World/sithSurface.h"
 #include "AI/sithAIClass.h"
+#include "General/stdFnames.h"
 #include "General/stdHashTable.h"
 #include "General/stdString.h"
 #include "World/sithSector.h"
@@ -611,6 +616,50 @@ sithCog* sithCog_LoadCogscript(const char *fpath)
     else
     {
         v9 = sithWorld_pLoading->numCogScriptsLoaded;
+#ifdef COG_USE_PRECOMPILED
+        /* Hard-fail if the pre-compiled .bcog is missing -- no fallback. */
+        if ( v9 < sithWorld_pLoading->numCogScripts )
+        {
+            char bcog_fpath[128];
+            const char *dot;
+            int base_len;
+            v8 = &sithWorld_pLoading->cogScripts[v9];
+            /* Build "cog/<basename>.bcog" using the platform separator.
+             * cog_fpath uses a hardcoded backslash which is wrong on Linux,
+             * so we rebuild from fpath (the bare filename). */
+            dot = _strrchr(fpath, '.');
+            base_len = dot ? (int)(dot - fpath) : (int)_strlen(fpath);
+            _sprintf(bcog_fpath, "cog%c%.*s.bcog", LEC_PATH_SEPARATOR_CHR, base_len, fpath);
+#ifndef WIN32
+            {
+                /* Print absolute path so the user knows exactly where to put the files. */
+                char cwd[256];
+                cwd[0] = '\0';
+                if (getcwd(cwd, sizeof(cwd)))
+                    stdPrintf(pSithHS->errorPrint, ".\\Cog\\sithCog.c", __LINE__,
+                              "COG_USE_PRECOMPILED: looking for '%s/%s'\n", cwd, bcog_fpath);
+                else
+                    stdPrintf(pSithHS->errorPrint, ".\\Cog\\sithCog.c", __LINE__,
+                              "COG_USE_PRECOMPILED: looking for '%s' (getcwd failed)\n", bcog_fpath);
+            }
+#endif
+            if (sithCogBinary_Load(bcog_fpath, v8))
+            {
+                stdHashTable_SetKeyVal(sithCog_pScriptHashtable, cog_fpath, v8);
+                ++sithWorld_pLoading->numCogScriptsLoaded;
+            }
+            else
+            {
+                stdPrintf(pSithHS->errorPrint, ".\\Cog\\sithCog.c", __LINE__,
+                          "COG_USE_PRECOMPILED: failed to load '%s'\n", bcog_fpath);
+                v8 = 0;
+            }
+        }
+        else
+        {
+            v8 = 0;
+        }
+#else
         if ( v9 < sithWorld_pLoading->numCogScripts && (v8 = &sithWorld_pLoading->cogScripts[v9], sithCogParse_Load(cog_fpath, v8, 0)) )
         {
             stdHashTable_SetKeyVal(sithCog_pScriptHashtable, cog_fpath, v8); // Added: v8 -> no v8 for cog_fpath
@@ -620,6 +669,7 @@ sithCog* sithCog_LoadCogscript(const char *fpath)
         {
             v8 = 0;
         }
+#endif
     }
     if ( !v8 )
         return 0;

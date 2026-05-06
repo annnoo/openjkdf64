@@ -123,3 +123,4 @@ build_openjkdf2_venv/*
 graphify-out/
 AGENTS.md.worktrees/
 .worktrees/
+build_linux64/*

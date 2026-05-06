@@ -10,6 +10,10 @@
 #include "Platform/TWL/dlmalloc.h"
 #endif
 
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
+
 #ifdef PLATFORM_POSIX
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,6 +25,79 @@
 #endif
 
 #include "SDL2_helper.h"
+
+#ifdef TARGET_N64
+static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
+{
+    // DFS is read-only, we only support "r" modes
+    if (mode[0] != 'r') return 0;
+
+    // DFS paths are absolute or relative to root.
+    // OpenJKDF2 often uses backslashes, convert to forward slashes.
+    char tmp[256];
+    size_t i;
+    for (i = 0; i < 255 && fpath[i]; i++) {
+        if (fpath[i] == '\\') tmp[i] = '/';
+        else tmp[i] = fpath[i];
+    }
+    tmp[i] = 0;
+
+    int handle = dfs_open(tmp);
+    if (handle < 0) return 0;
+    
+    return (stdFile_t)handle;
+}
+
+static int N64_stdFileClose(stdFile_t fhand)
+{
+    return dfs_close((uint32_t)fhand);
+}
+
+static size_t N64_stdFileRead(stdFile_t fhand, void* dst, size_t len)
+{
+    int ret = dfs_read(dst, 1, len, (uint32_t)fhand);
+    return (ret < 0) ? 0 : (size_t)ret;
+}
+
+static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
+{
+    return 0; // DFS is read-only
+}
+
+static const char* N64_stdFileGets(stdFile_t fhand, char* dst, size_t len)
+{
+    // Simplified gets using dfs_read one by one
+    size_t i = 0;
+    char c;
+    while (i < len - 1) {
+        if (dfs_read(&c, 1, 1, (uint32_t)fhand) <= 0) break;
+        dst[i++] = c;
+        if (c == '\n') break;
+    }
+    dst[i] = 0;
+    return (i == 0) ? NULL : dst;
+}
+
+static int N64_stdFseek(stdFile_t fhand, int a, int b)
+{
+    return dfs_seek((uint32_t)fhand, a, b);
+}
+
+static int N64_stdFtell(stdFile_t fhand)
+{
+    return dfs_tell((uint32_t)fhand);
+}
+
+static int N64_stdFeof(stdFile_t fhand)
+{
+    return dfs_eof((uint32_t)fhand);
+}
+
+uint32_t N64_TimeMs()
+{
+    return (uint32_t)(timer_ticks_to_ms(timer_get_ticks()));
+}
+#endif
 
 #ifdef PLATFORM_POSIX
 uint32_t Linux_TimeMs()
@@ -750,6 +827,19 @@ void stdPlatform_InitServices(HostServices *handlers)
     handlers->free = TWL_free;
     handlers->realloc = TWL_realloc;
     handlers->suggestHeap = TWL_suggestHeap;
+#endif
+
+#ifdef TARGET_N64
+    dfs_init(DFS_DEFAULT_LOCATION);
+    handlers->fileOpen = N64_stdFileOpen;
+    handlers->fileClose = N64_stdFileClose;
+    handlers->fileRead = N64_stdFileRead;
+    handlers->fileGets = N64_stdFileGets;
+    handlers->fileWrite = N64_stdFileWrite;
+    handlers->fseek = N64_stdFseek;
+    handlers->ftell = N64_stdFtell;
+    handlers->fileEof = N64_stdFeof;
+    handlers->getTimerTick = N64_TimeMs;
 #endif
 }
 
