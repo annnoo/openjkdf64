@@ -69,8 +69,10 @@ extern void n64_frame_end(void);
 void Window_Main_Loop(void)
 {
     n64_frame_begin();
+    mixer_try_play();       // pump audio — must be called frequently
     jkMain_GuiAdvance();
     Window_msg_main_handler(g_hWnd, WM_PAINT, 0, 0);
+    mixer_try_play();       // second pump after frame work
     n64_frame_end();
 }
 

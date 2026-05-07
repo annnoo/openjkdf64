@@ -1649,10 +1649,12 @@ int jkMain_SetVideoMode()
         newH = Window_ySize;
     }
 
+#ifndef TARGET_N64
     if (newW < 640)
         newW = 640;
     if (newH < 480)
         newH = 480;
+#endif
 
     Video_modeStruct.viewSizeIdx = 0;
     Video_modeStruct.aViewSizes[Video_modeStruct.viewSizeIdx].xMin = 0;

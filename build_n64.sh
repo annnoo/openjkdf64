@@ -90,6 +90,39 @@ cmd_configure() {
     ok "Configure done"
 }
 
+cmd_audio() {
+    check_libdragon
+    libdragon start
+
+    local ASSET_DIR="$SCRIPT_DIR/tools/out"
+    local FS_DIR="$SCRIPT_DIR/filesystem"
+
+    # Convert WAV -> wav64 (VADPCM, 22050 Hz, mono) inside container
+    if [ -d "$ASSET_DIR/sound" ] || [ -d "$ASSET_DIR/voice" ]; then
+        info "Converting audio assets to wav64..."
+        container "python3 tools/convert_media.py tools/out" \
+            || warn "Audio conversion had errors (continuing)"
+        ok "Audio conversion done"
+
+        # Sync wav64 files into filesystem/ so mkdfs packs them
+        for subdir in sound voice; do
+            if [ -d "$ASSET_DIR/$subdir" ]; then
+                mkdir -p "$FS_DIR/$subdir"
+                # Raw WAV: engine opens these to parse + read PCM
+                find "$ASSET_DIR/$subdir" -name "*.wav" \
+                    -exec cp -u {} "$FS_DIR/$subdir/" \;
+                # Compressed wav64: available for future streaming/music use
+                find "$ASSET_DIR/$subdir" -name "*.wav64" \
+                    -exec cp -u {} "$FS_DIR/$subdir/" \;
+            fi
+        done
+        ok "wav64 files synced to filesystem/"
+    else
+        warn "No audio assets found under tools/out — skipping audio conversion"
+        warn "Run: python3 tools/extract_gob.py <path-to-JK-GOBs> tools/out"
+    fi
+}
+
 cmd_build() {
     check_libdragon
     libdragon start
@@ -98,6 +131,9 @@ cmd_build() {
     if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
         cmd_configure
     fi
+
+    # Convert and sync audio assets before the ROM link
+    cmd_audio
 
     info "Building..."
     container "cmake --build build_n64 --parallel \$(nproc)"
@@ -141,11 +177,12 @@ cmd_run() {
 case "${1:-build}" in
     build)     cmd_build     ;;
     configure) cmd_configure ;;
+    audio)     cmd_audio     ;;
     clean)     cmd_clean     ;;
     rebuild)   cmd_rebuild   ;;
     run)       cmd_run       ;;
     *)
-        printf 'Usage: %s [build|configure|clean|rebuild|run]\n' "$0"
+        printf 'Usage: %s [build|configure|audio|clean|rebuild|run]\n' "$0"
         exit 1
         ;;
 esac

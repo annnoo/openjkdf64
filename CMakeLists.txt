@@ -34,10 +34,11 @@ set(PLAT_HOOKS FALSE CACHE BOOL "Hook DLL target")
 set(PLAT_MSVC FALSE CACHE BOOL "Windows 64-bit MSVC")
 set(PLAT_ANDROID_ARM64 FALSE CACHE BOOL "Android AArch64")
 set(PLAT_TWL FALSE CACHE BOOL "Nintendo DSi")
+set(PLAT_N64 FALSE CACHE BOOL "Nintendo 64 (libdragon)")
 set(PLAT_AUTO FALSE CACHE BOOL "Target the host OS")
 
 # Set PLAT_AUTO if a platform isn't specifically selected
-if(NOT PLAT_LINUX_32 AND NOT PLAT_LINUX_64 AND NOT PLAT_MACOS AND NOT PLAT_MACOS_X86_64 AND NOT PLAT_MINGW_X86_64 AND NOT PLAT_WASM AND NOT PLAT_HOOKS AND NOT PLAT_TWL)
+if(NOT PLAT_LINUX_32 AND NOT PLAT_LINUX_64 AND NOT PLAT_MACOS AND NOT PLAT_MACOS_X86_64 AND NOT PLAT_MINGW_X86_64 AND NOT PLAT_WASM AND NOT PLAT_HOOKS AND NOT PLAT_TWL AND NOT PLAT_N64)
     set(PLAT_AUTO TRUE)
 endif()
 
@@ -60,8 +61,9 @@ set(TARGET_WIN32 FALSE)
 set(TARGET_WASM FALSE)
 set(TARGET_ANDROID FALSE)
 set(TARGET_ANDROID_ARM64 FALSE)
-set(TARGET_TWL FALSE)
-set(TARGET_HOOKS FALSE)
+    set(TARGET_TWL FALSE)
+    set(TARGET_N64 FALSE)
+    set(TARGET_HOOKS FALSE)
 set(TARGET_NO_BLOBS FALSE)
 set(TARGET_CAN_JKGM FALSE)
 set(TARGET_NO_MULTIPLAYER_MENUS FALSE)
@@ -141,6 +143,8 @@ elseif(PLAT_MSVC)
     include(cmake_modules/plat_msvc.cmake)
 elseif(PLAT_TWL)
     include(cmake_modules/plat_twl.cmake)
+elseif(PLAT_N64)
+    include(cmake_modules/plat_n64.cmake)
 else()
     message(FATAL_ERROR "Unknown platform! Cannot continue.")
 endif()
@@ -151,6 +155,127 @@ plat_initialize()
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+
+# ── N64 engine build ──────────────────────────────────────────────────────────
+# Full engine compilation for N64.  We skip only files that are genuinely
+# incompatible (DirectX, SDL2, TWL-specific, flex/bison parsers) and replace
+# platform layers with src/Platform/N64/ stubs.
+if(TARGET_N64)
+    set(JSON_Install OFF CACHE INTERNAL "")
+    add_subdirectory(${CMAKE_SOURCE_DIR}/3rdparty/json)
+
+    # Pre-generated globals (committed; avoids cogapp/Python in container)
+    set(N64_GENERATED_DIR ${PROJECT_SOURCE_DIR}/src/Platform/N64/generated)
+
+    include_directories(
+        ${PROJECT_SOURCE_DIR}/src
+        ${N64_GENERATED_DIR}
+    )
+
+    # ── Collect engine sources ─────────────────────────────────────────────────
+    file(GLOB N64_GENERAL_SRCS    ${PROJECT_SOURCE_DIR}/src/General/*.c)
+    file(GLOB N64_PRIMITIVES_SRCS ${PROJECT_SOURCE_DIR}/src/Primitives/*.c)
+    file(GLOB N64_ENGINE_SRCS     ${PROJECT_SOURCE_DIR}/src/Engine/*.c)
+    file(GLOB N64_RASTER_SRCS     ${PROJECT_SOURCE_DIR}/src/Raster/*.c)
+    file(GLOB N64_WORLD_SRCS      ${PROJECT_SOURCE_DIR}/src/World/*.c)
+    file(GLOB N64_AI_SRCS         ${PROJECT_SOURCE_DIR}/src/AI/*.c)
+    file(GLOB N64_GAMEPLAY_SRCS   ${PROJECT_SOURCE_DIR}/src/Gameplay/*.c)
+    file(GLOB N64_GUI_SRCS        ${PROJECT_SOURCE_DIR}/src/Gui/*.c)
+    file(GLOB N64_MAIN_SRCS        ${PROJECT_SOURCE_DIR}/src/Main/*.c)
+    # Platform/N64/jkCutscene.c replaces the real one (smacker not supported)
+    list(REMOVE_ITEM N64_MAIN_SRCS ${PROJECT_SOURCE_DIR}/src/Main/jkCutscene.c)
+    file(GLOB N64_DEVICES_SRCS    ${PROJECT_SOURCE_DIR}/src/Devices/*.c)
+    file(GLOB N64_DSS_SRCS        ${PROJECT_SOURCE_DIR}/src/Dss/*.c)
+    list(REMOVE_ITEM N64_DSS_SRCS ${PROJECT_SOURCE_DIR}/src/Dss/sithMulti.c)
+    file(GLOB N64_TEST_SRCS       ${PROJECT_SOURCE_DIR}/src/Tests/*.c)
+
+    # COG: runtime files only; skip flex/bison generated parser (COG_USE_PRECOMPILED)
+    # sithCogParse.c is included for its symbol-table functions (NewSymboltable etc.)
+    set(N64_COG_SRCS
+        ${PROJECT_SOURCE_DIR}/src/Cog/jkCog.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCog.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogBinary.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogExec.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunction.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunctionAI.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunctionPlayer.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunctionSector.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunctionSound.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunctionSurface.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogFunctionThing.c
+        ${PROJECT_SOURCE_DIR}/src/Cog/sithCogParse.c
+    )
+
+    # Win95 layer: exclude DirectX, SDL2/GL windows, TWL-specific, sound
+    # (sound, stdDisplay, Window replaced by Platform/N64/)
+    file(GLOB N64_WIN95_SRCS ${PROJECT_SOURCE_DIR}/src/Win95/*.c)
+    list(REMOVE_ITEM N64_WIN95_SRCS
+        ${PROJECT_SOURCE_DIR}/src/Win95/DirectX.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/Window.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/Window_Twl.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/stdDisplay.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/stdDisplay_Twl.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/stdComm.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/stdConsole.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/stdMci.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/stdSound.c
+        ${PROJECT_SOURCE_DIR}/src/Win95/Video.c
+    )
+
+    # Root src files (exclude entry points; main_n64.c added to executable separately)
+    set(N64_ROOT_SRCS
+        ${PROJECT_SOURCE_DIR}/src/stdPlatform.c
+        ${PROJECT_SOURCE_DIR}/src/wprintf.c
+        ${PROJECT_SOURCE_DIR}/src/version.c
+        ${PROJECT_SOURCE_DIR}/src/jk.c
+        ${PROJECT_SOURCE_DIR}/src/hook.c
+        ${PROJECT_SOURCE_DIR}/src/unusedWontImpl.c
+        ${PROJECT_SOURCE_DIR}/src/main_globals.c
+    )
+
+    # Platform/N64 stubs (only the .c files in the top-level N64 directory)
+    file(GLOB N64_PLATFORM_SRCS   ${PROJECT_SOURCE_DIR}/src/Platform/N64/*.c)
+    # Plus the pre-generated globals
+    set(N64_PLATFORM_SRCS ${N64_PLATFORM_SRCS}
+        ${N64_GENERATED_DIR}/globals.c
+    )
+
+    # ── Combine all sources ────────────────────────────────────────────────────
+    set(N64_ALL_SRCS
+        ${N64_GENERAL_SRCS}
+        ${N64_PRIMITIVES_SRCS}
+        ${N64_ENGINE_SRCS}
+        ${N64_RASTER_SRCS}
+        ${N64_WORLD_SRCS}
+        ${N64_AI_SRCS}
+        ${N64_GAMEPLAY_SRCS}
+        ${N64_GUI_SRCS}
+        ${N64_MAIN_SRCS}
+        ${N64_DEVICES_SRCS}
+        ${N64_DSS_SRCS}
+        ${N64_COG_SRCS}
+        ${N64_WIN95_SRCS}
+        ${N64_ROOT_SRCS}
+        ${N64_PLATFORM_SRCS}
+    )
+    list(REMOVE_ITEM N64_ALL_SRCS ${N64_TEST_SRCS})
+
+    # ── Targets ────────────────────────────────────────────────────────────────
+    add_executable(${BIN_NAME}
+        ${PROJECT_SOURCE_DIR}/src/main_n64.c
+        ${N64_ALL_SRCS}
+    )
+
+    # Dummy sith_engine OBJECT library (plat_link_and_package references it)
+    add_library(sith_engine OBJECT ${PROJECT_SOURCE_DIR}/src/main_n64.c)
+    target_link_libraries(sith_engine PRIVATE nlohmann_json::nlohmann_json)
+
+    target_link_libraries(${BIN_NAME} PRIVATE nlohmann_json::nlohmann_json)
+
+    plat_link_and_package()
+    return()
+endif()
+# ─────────────────────────────────────────────────────────────────────────────
 
 # CMake module paths
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
@@ -193,13 +318,18 @@ file(GLOB ENGINE_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/*.c
                        ${PROJECT_SOURCE_DIR}/src/Platform/Common/*.c
                        ${PROJECT_SOURCE_DIR}/src/Platform/Common/*.cpp)
 
-# Game main
-file(GLOB GAME_MAIN_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/main.c)
+# Game main — N64 uses its own entry point
+if(TARGET_N64)
+    set(GAME_MAIN_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/main_n64.c)
+else()
+    file(GLOB GAME_MAIN_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/main.c)
+endif()
 
 # Remove test sources from glob
 file(GLOB TEST_SRCS ${PROJECT_SOURCE_DIR}/src/Tests/*.c)
 list(REMOVE_ITEM ENGINE_SOURCE_FILES ${TEST_SRCS})
 list(REMOVE_ITEM ENGINE_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/main.c)
+list(REMOVE_ITEM ENGINE_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/main_n64.c)
 
 # Remove multiplayer menus from compilation
 file(GLOB MULTIPLAYER_MENU_SRCS 

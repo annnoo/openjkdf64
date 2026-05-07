@@ -97,7 +97,7 @@ int stdDisplay_SetMode(unsigned int modeIdx, const void *palette, int paged)
     Video_otherBuf.format.texture_size_in_bytes   = pitch * newH;
 
     if (!Video_menuBuffer.surface_lock_alloc)
-        Video_menuBuffer.surface_lock_alloc = (char*)std_pHS->alloc(640 * 480); // game forces minimum 640x480 internally
+        Video_menuBuffer.surface_lock_alloc = (char*)std_pHS->alloc(320 * 240);
 
     Video_bModeSet = 1;
     return 1;
@@ -304,6 +304,11 @@ int stdDisplay_SetCooperativeLevel(uint32_t a) { return 0; }
 
 static surface_t *n64_current_disp = NULL;
 
+// ── FPS counter state ─────────────────────────────────────────────────────────
+static uint32_t fps_frame_count  = 0;
+static uint32_t fps_last_ms      = 0;
+static float    fps_current      = 0.0f;
+
 void n64_frame_begin(void)
 {
     if (!n64_current_disp)
@@ -339,16 +344,10 @@ int stdDisplay_DrawAndFlipGdi(uint32_t a)
 
     uint16_t* dst = (uint16_t*)disp->buffer;
 
-    // If the source buffer is 2× the display size (640×480 → 320×240), downsample 2:1.
-    uint32_t src_w = Video_menuBuffer.format.width;
-    uint32_t src_h = Video_menuBuffer.format.height;
-    int scale2x = (src_w >= DISP_W * 2 && src_h >= DISP_H * 2);
-
+    // Straight 1:1 blit: game runs natively at 320×240.
     for (uint32_t y = 0; y < DISP_H; y++) {
-        uint32_t sy = scale2x ? y * 2 : y;
         for (uint32_t x = 0; x < DISP_W; x++) {
-            uint32_t sx = scale2x ? x * 2 : x;
-            uint8_t pal_idx = src[sy * src_stride + sx];
+            uint8_t pal_idx = src[y * src_stride + x];
             rdColor24 c = stdDisplay_masterPalette[pal_idx];
             // RGB888 → RGBA5551 (N64 native 16-bit, big-endian)
             uint16_t px = (uint16_t)(((c.r >> 3) << 11) | ((c.g >> 3) << 6) | ((c.b >> 3) << 1) | 1);
@@ -357,6 +356,28 @@ int stdDisplay_DrawAndFlipGdi(uint32_t a)
     }
 
     // display_show() is called by n64_frame_end() at the end of the main loop.
+
+    // ── FPS counter (bottom-right) ────────────────────────────────────────────
+    fps_frame_count++;
+    uint32_t now_ms = (uint32_t)(TIMER_MICROS_LL(timer_ticks()) / 1000);
+    if (fps_last_ms == 0) fps_last_ms = now_ms;
+    uint32_t elapsed = now_ms - fps_last_ms;
+    if (elapsed >= 500) {  // update every 0.5s
+        fps_current  = (float)fps_frame_count * 1000.0f / (float)elapsed;
+        fps_frame_count = 0;
+        fps_last_ms  = now_ms;
+    }
+    {
+        char fps_str[16];
+        // simple int display to avoid float formatting
+        int fps_int  = (int)fps_current;
+        int fps_frac = (int)((fps_current - fps_int) * 10.0f);
+        sprintf(fps_str, "FPS:%d.%d", fps_int, fps_frac);
+        graphics_set_color(graphics_make_color(255, 255, 0, 255),
+                           graphics_make_color(0,   0,   0, 255));
+        graphics_draw_text(disp, DISP_W - 72, DISP_H - 10, fps_str);
+    }
+
     return 0;
 }
 
