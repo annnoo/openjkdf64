@@ -48,6 +48,8 @@ typedef struct {
     rdVector3 vel;
     // ── N64 extension ─────────────────────────────────────────────────────────
     waveform_t wave;
+    wav64_t    wav64;
+    int        is_wav64;
     int        mixer_ch;     // -1 when not playing
     int        looping;
 } n64SoundBuf_t;
@@ -108,6 +110,29 @@ uint32_t stdSound_ParseWav(stdFile_t sound_file,
     char v9[4];
     stdWaveFormat v10;
     uint32_t seekPos;
+
+    // Check for wav64 first
+    std_pHS->fseek(sound_file, 0, 0);
+    std_pHS->fileRead(sound_file, v9, 4);
+    if (!_memcmp(v9, "WAV6", 4)) {
+        // This is a wav64 file. Metadata is at known offsets.
+        // We'll use a temporary wav64_t to parse it if we could, 
+        // but for now let's just parse the bits we need.
+        uint32_t channels, frequency;
+        std_pHS->fseek(sound_file, 8, 0);
+        std_pHS->fileRead(sound_file, &channels, 4);
+        std_pHS->fileRead(sound_file, &frequency, 4);
+        
+        *nSamplesPerSec = frequency;
+        *bitsPerSample = 16; // Most wav64 are 16-bit
+        *bStereo = (channels == 2);
+        *seekOffset = 0xFFFFFFFF; // Special flag for wav64
+        
+        // Return total size of file as a rough estimate for bufferBytes
+        std_pHS->fseek(sound_file, 0, SEEK_END);
+        result = std_pHS->ftell(sound_file);
+        return result;
+    }
 
     std_pHS->fseek(sound_file, 8, 0);
     std_pHS->fileRead(sound_file, v9, 4);
@@ -203,12 +228,49 @@ stdSound_buffer_t* stdSound_BufferCreate(int bStereo, uint32_t nSamplesPerSec,
     return (stdSound_buffer_t*)nb;
 }
 
+stdSound_buffer_t* stdSound_BufferCreateFromHandle(stdFile_t fhand)
+{
+    const char* path = N64_GetPathForHandle(fhand);
+    if (!path) return NULL;
+
+    n64SoundBuf_t *nb = (n64SoundBuf_t*)malloc(sizeof(n64SoundBuf_t));
+    if (!nb) return NULL;
+    memset(nb, 0, sizeof(*nb));
+
+    // wav64_open wants a path like "rom:/sound/fire.wav64"
+    char romPath[256];
+    if (path[0] == '/')
+        snprintf(romPath, sizeof(romPath), "rom:%s", path);
+    else
+        snprintf(romPath, sizeof(romPath), "rom:/%s", path);
+
+    wav64_open(&nb->wav64, romPath);
+    nb->is_wav64 = 1;
+    nb->mixer_ch = -1;
+    nb->vol      = 1.0f;
+    
+    // Fill in standard fields for common code
+    nb->bStereo        = (nb->wav64.wave.channels == 2);
+    nb->nSamplesPerSec = (uint32_t)nb->wav64.wave.frequency;
+    nb->bitsPerSample  = 16; 
+    nb->bufferLen      = nb->wav64.wave.len;
+    
+    debugf("[N64] stdSound_BufferCreateFromHandle: opened %s (%d Hz, %d ch)\n", 
+           romPath, (int)nb->nSamplesPerSec, nb->bStereo ? 2 : 1);
+
+    return (stdSound_buffer_t*)nb;
+}
+
 void stdSound_BufferRelease(stdSound_buffer_t *buf)
 {
     if (!buf) return;
     n64SoundBuf_t *nb = (n64SoundBuf_t*)buf;
     stdSound_BufferStop(buf);
-    free(nb->data);
+    if (nb->is_wav64) {
+        wav64_close(&nb->wav64);
+    } else {
+        free(nb->data);
+    }
     free(nb);
 }
 
@@ -263,10 +325,6 @@ int stdSound_BufferPlay(stdSound_buffer_t *buf, int loop)
 {
     if (!buf || !g_audio_inited) return 0;
     n64SoundBuf_t *nb = (n64SoundBuf_t*)buf;
-    if (!nb->data || nb->bufferLen <= 0) return 0;
-
-    nb->looping       = loop;
-    nb->wave.loop_len = loop ? nb->wave.len : 0;
 
     int ch = alloc_sfx_ch();
     nb->mixer_ch = ch;
@@ -276,7 +334,16 @@ int stdSound_BufferPlay(stdSound_buffer_t *buf, int loop)
     if (vol > 1.0f) vol = 1.0f;
 
     mixer_ch_set_vol_pan(ch, vol, 0.5f);
-    mixer_ch_play(ch, &nb->wave);
+    
+    if (nb->is_wav64) {
+        wav64_set_loop(&nb->wav64, loop);
+        wav64_play(&nb->wav64, ch);
+    } else {
+        if (!nb->data || nb->bufferLen <= 0) return 0;
+        nb->looping       = loop;
+        nb->wave.loop_len = loop ? nb->wave.len : 0;
+        mixer_ch_play(ch, &nb->wave);
+    }
     return 1;
 }
 
@@ -346,7 +413,11 @@ void stdSound_BufferSetFrequency(stdSound_buffer_t *buf, int freq)
     if (!buf || freq <= 0) return;
     n64SoundBuf_t *nb = (n64SoundBuf_t*)buf;
     nb->nSamplesPerSec = freq;
-    nb->wave.frequency = (float)freq;
+    if (nb->is_wav64)
+        nb->wav64.wave.frequency = (float)freq;
+    else
+        nb->wave.frequency = (float)freq;
+
     if (nb->mixer_ch >= 0 && mixer_ch_playing(nb->mixer_ch))
         mixer_ch_set_freq(nb->mixer_ch, (float)freq);
 }

@@ -27,6 +27,9 @@
 #include "SDL2_helper.h"
 
 #ifdef TARGET_N64
+#define MAX_DFS_HANDLES 128
+static char g_dfs_paths[MAX_DFS_HANDLES][128];
+
 static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
 {
     // DFS is read-only
@@ -55,15 +58,49 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
 
     int handle = dfs_open(tmp);
     if (handle < 0) {
+        // If it was a .wav request, try .wav64
+        size_t len = strlen(tmp);
+        if (len > 4 && strcmp(&tmp[len-4], ".wav") == 0) {
+            strcpy(&tmp[len-4], ".wav64");
+            handle = dfs_open(tmp);
+            if (handle >= 0) {
+                debugf("[N64_fileOpen] redirected .wav -> .wav64: \"%s\" OK handle=%d\n", tmp, handle);
+            } else {
+                // Restore .wav for error message if .wav64 also failed
+                strcpy(&tmp[len-4], ".wav");
+            }
+        }
+    }
+
+    if (handle < 0) {
         debugf("[N64_fileOpen] dfs_open(\"%s\") FAILED: %s\n", tmp, dfs_strerror(handle));
         return 0;
     }
+
+    if (handle < MAX_DFS_HANDLES) {
+        strncpy(g_dfs_paths[handle], tmp, 127);
+        g_dfs_paths[handle][127] = 0;
+    }
+
     debugf("[N64_fileOpen] dfs_open(\"%s\") OK handle=%d\n", tmp, handle);
     return (stdFile_t)(uintptr_t)handle;
 }
 
+const char* N64_GetPathForHandle(stdFile_t fhand)
+{
+    int handle = (int)(uintptr_t)fhand;
+    if (handle >= 0 && handle < MAX_DFS_HANDLES) {
+        return g_dfs_paths[handle];
+    }
+    return NULL;
+}
+
 static int N64_stdFileClose(stdFile_t fhand)
 {
+    int handle = (int)(uintptr_t)fhand;
+    if (handle >= 0 && handle < MAX_DFS_HANDLES) {
+        g_dfs_paths[handle][0] = 0;
+    }
     return dfs_close((uint32_t)(uintptr_t)fhand);
 }
 

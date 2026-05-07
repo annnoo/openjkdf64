@@ -55,6 +55,9 @@ uint64_t Linux_TimeUs();
 int stdPrintf(int (*a1)(const char *, ...), const char *a2, int line, const char *fmt, ...);
 int stdPlatform_Printf(const char *fmt, ...);
 uint32_t stdPlatform_GetTimeMsec();
+#ifdef TARGET_N64
+const char* N64_GetPathForHandle(stdFile_t fhand);
+#endif
 #endif
 
 int stdConsolePrintf(const char *fmt, ...);

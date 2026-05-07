@@ -235,28 +235,48 @@ int sithSound_LoadFileData(sithSound *sound)
     if (sound->isLoaded & 1)
         return 0;
 
+    fd = sithSound_FindInSearchPaths(sound->sound_fname, outstr2, 128);
+    if ( !fd )
+        return 0;
+
     if ( sound->bufferBytes + sithSound_curDataLoaded > sithSound_maxDataLoaded )
         sithSound_FreeUpMemory(sound->bufferBytes + 0x19000);
-    stdSound_buffer_t* dsoundBuf = stdSound_BufferCreate(sound->bStereo, sound->sampleRateHz, sound->bitsPerSample, sound->bufferBytes);
+
+    stdSound_buffer_t* dsoundBuf;
+#ifdef TARGET_N64
+    if (sound->seekOffset == 0xFFFFFFFF) {
+        dsoundBuf = stdSound_BufferCreateFromHandle(fd);
+    } else {
+        dsoundBuf = stdSound_BufferCreate(sound->bStereo, sound->sampleRateHz, sound->bitsPerSample, sound->bufferBytes);
+    }
+#else
+    dsoundBuf = stdSound_BufferCreate(sound->bStereo, sound->sampleRateHz, sound->bitsPerSample, sound->bufferBytes);
+#endif
+
     if ( dsoundBuf )
     {
         sound->dsoundBuffer2 = dsoundBuf;
+
+#ifdef TARGET_N64
+        if (sound->seekOffset == 0xFFFFFFFF) {
+            sound->isLoaded |= 1u;
+            pSithHS->fileClose(fd);
+            return 1;
+        }
+#endif
+
         sithSound_curDataLoaded += sound->bufferBytes;
         
-        fd = sithSound_FindInSearchPaths(sound->sound_fname, outstr2, 128);
-        if ( fd )
+        pSithHS->fseek(fd, sound->seekOffset, 0);
+        buf = stdSound_BufferSetData(sound->dsoundBuffer2, sound->bufferBytes, &bufferMaxSize);
+        if ( buf )
         {
-            pSithHS->fseek(fd, sound->seekOffset, 0);
-            buf = stdSound_BufferSetData(sound->dsoundBuffer2, sound->bufferBytes, &bufferMaxSize);
-            if ( buf )
+            int numRead = pSithHS->fileRead(fd, buf, bufferMaxSize);
+            if ( stdSound_BufferUnlock(sound->dsoundBuffer2, buf, numRead) )
             {
-                int numRead = pSithHS->fileRead(fd, buf, bufferMaxSize);
-                if ( stdSound_BufferUnlock(sound->dsoundBuffer2, buf, numRead) )
-                {
-                    sound->isLoaded |= 1u;
-                    pSithHS->fileClose(fd);
-                    return 1;
-                }
+                sound->isLoaded |= 1u;
+                pSithHS->fileClose(fd);
+                return 1;
             }
         }
     }
@@ -277,6 +297,9 @@ int sithSound_UnloadData(sithSound *sound)
     stdSound_BufferRelease(sound->dsoundBuffer2);
     sound->isLoaded &= ~1u;
     sound->dsoundBuffer2 = 0;
+#ifdef TARGET_N64
+    if (sound->seekOffset != 0xFFFFFFFF)
+#endif
     sithSound_curDataLoaded -= sound->bufferBytes;
     return 1;
 }
@@ -402,6 +425,14 @@ stdSound_buffer_t* sithSound_InitFromPath(char *path)
         bufferLen = stdSound_ParseWav(fd, &nSamplesPerSec, &bitsPerSample, &bStereo, &seekOffs);
         if ( bufferLen )
         {
+#ifdef TARGET_N64
+            if (seekOffs == 0xFFFFFFFF)
+            {
+                dsoundBuf = stdSound_BufferCreateFromHandle(fd);
+                pSithHS->fileClose(fd);
+                return dsoundBuf;
+            }
+#endif
             createdBuf = stdSound_BufferCreate(bStereo, nSamplesPerSec, bitsPerSample, bufferLen);
             dsoundBuf = createdBuf;
             if ( createdBuf )

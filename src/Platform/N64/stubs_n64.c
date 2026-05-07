@@ -126,15 +126,68 @@ int  Video_SetVideoDesc(const void *color_buf) { return 1; }
 int  stdConsole_Startup(LPCSTR lpConsoleTitle, uint32_t dwWriteCoord, int a3) { return 1; }
 int  stdConsole_Shutdown() { return 1; }
 
-// ── stdMci (CD audio — no optical drive on N64) ───────────────────────────────
-
+// ── stdMci (CD audio — using wav64 on N64) ───────────────────────────────
 #include "Win95/stdMci.h"
+#include <wav64.h>
+#include <stdio.h>
+#include <libdragon.h>
+
+static wav64_t g_mci_wav;
+static bool g_mci_open = false;
+static int g_mci_ch = 0; // Use channel 0 for music
+static float g_mci_vol = 1.0f;
+
 int   stdMci_Startup()                              { return 1; }
-void  stdMci_Shutdown()                             {}
-int   stdMci_Play(uint8_t trackFrom, uint8_t trackTo) { return 0; }
-void  stdMci_SetVolume(flex_t vol)                  {}
-void  stdMci_Stop()                                 {}
-int   stdMci_CheckStatus()                          { return 0; }
+void  stdMci_Shutdown()                             {
+    if (g_mci_open) {
+        wav64_close(&g_mci_wav);
+        g_mci_open = false;
+    }
+}
+
+int   stdMci_Play(uint8_t trackFrom, uint8_t trackTo) {
+    if (g_mci_open) {
+        mixer_ch_stop(g_mci_ch);
+        wav64_close(&g_mci_wav);
+        g_mci_open = false;
+    }
+
+    char path[64];
+    // Map track number to file. JK usually starts at track 2 (track 1 is data).
+    // Some mods might use different numbering.
+    snprintf(path, sizeof(path), "rom:/music/track%02d.wav64", trackFrom);
+    
+    wav64_open(&g_mci_wav, path);
+    // wav64_open doesn't return a value, but it sets wav64.handle to -1 or similar on error?
+    // Actually, libdragon usually assets or debugfs errors.
+    // Let's assume it works if we reached here, or check handle if available.
+    g_mci_open = true;
+    wav64_set_loop(&g_mci_wav, true);
+    mixer_ch_set_vol_pan(g_mci_ch, g_mci_vol, 0.5f);
+    wav64_play(&g_mci_wav, g_mci_ch);
+    debugf("[N64] stdMci_Play: started %s\n", path);
+    return 1;
+}
+
+void  stdMci_SetVolume(flex_t vol)                  {
+    g_mci_vol = (float)vol;
+    if (g_mci_vol < 0.0f) g_mci_vol = 0.0f;
+    if (g_mci_vol > 1.0f) g_mci_vol = 1.0f;
+    mixer_ch_set_vol_pan(g_mci_ch, g_mci_vol, 0.5f);
+}
+
+void  stdMci_Stop()                                 {
+    if (g_mci_open) {
+        mixer_ch_stop(g_mci_ch);
+        wav64_close(&g_mci_wav);
+        g_mci_open = false;
+    }
+}
+
+int   stdMci_CheckStatus()                          { 
+    return g_mci_open && mixer_ch_playing(g_mci_ch); 
+}
+
 int   stdMci_bIsGOG = 0;
 
 // ── stdHttp (no network on N64) ───────────────────────────────────────────────

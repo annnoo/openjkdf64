@@ -157,6 +157,7 @@ int stdSound_Startup();
 void stdSound_Shutdown();
 void stdSound_SetMenuVolume(flex_t a1);
 stdSound_buffer_t* stdSound_BufferCreate(int bStereo, uint32_t nSamplesPerSec, uint16_t bitsPerSample, int bufferLen);
+stdSound_buffer_t* stdSound_BufferCreateFromHandle(stdFile_t fhand);
 void* stdSound_BufferSetData(stdSound_buffer_t* sound, int bufferBytes, int32_t* bufferMaxSize);
 int stdSound_BufferUnlock(stdSound_buffer_t* sound, void* buffer, int bufferRead);
 void stdSound_BufferRelease(stdSound_buffer_t* sound);
