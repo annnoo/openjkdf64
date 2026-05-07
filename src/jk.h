@@ -15,7 +15,7 @@
 #include <ctype.h>
 #endif
 
-#if defined(MACOS) || defined(LINUX) || defined(TARGET_TWL)
+#if defined(MACOS) || defined(LINUX) || defined(TARGET_TWL) || defined(TARGET_N64)
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

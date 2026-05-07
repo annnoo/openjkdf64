@@ -1,6 +1,44 @@
 #include "stdBitmap.h"
 
 #include "stdPlatform.h"
+#ifdef TARGET_N64
+#include "n64_endian.h"
+static inline void stdBitmap_SwapHeader(bitmapHeader *h) {
+    // magic is "BM  " compared via memcmp - do NOT swap
+    h->field_4  = GU_SWAP32(h->field_4);
+    h->field_8  = GU_SWAP32(h->field_8);
+    h->palFmt   = GU_SWAP32(h->palFmt);
+    h->numMips  = GU_SWAP32(h->numMips);
+    h->xPos     = GU_SWAP32(h->xPos);
+    h->yPos     = GU_SWAP32(h->yPos);
+    h->colorkey = GU_SWAP32(h->colorkey);
+    // rdTexFormat
+    h->format.is16bit    = GU_SWAP32(h->format.is16bit);
+    h->format.bpp        = GU_SWAP32(h->format.bpp);
+    h->format.r_bits     = GU_SWAP32(h->format.r_bits);
+    h->format.g_bits     = GU_SWAP32(h->format.g_bits);
+    h->format.b_bits     = GU_SWAP32(h->format.b_bits);
+    h->format.r_shift    = GU_SWAP32(h->format.r_shift);
+    h->format.g_shift    = GU_SWAP32(h->format.g_shift);
+    h->format.b_shift    = GU_SWAP32(h->format.b_shift);
+    h->format.r_bitdiff  = GU_SWAP32(h->format.r_bitdiff);
+    h->format.g_bitdiff  = GU_SWAP32(h->format.g_bitdiff);
+    h->format.b_bitdiff  = GU_SWAP32(h->format.b_bitdiff);
+    h->format.unk_40     = GU_SWAP32(h->format.unk_40);
+    h->format.unk_44     = GU_SWAP32(h->format.unk_44);
+    h->format.unk_48     = GU_SWAP32(h->format.unk_48);
+    h->field_58 = GU_SWAP32(h->field_58);
+    h->field_5C = GU_SWAP32(h->field_5C);
+    h->field_60 = GU_SWAP32(h->field_60);
+    h->field_64 = GU_SWAP32(h->field_64);
+    h->field_68 = GU_SWAP32(h->field_68);
+    h->field_6C = GU_SWAP32(h->field_6C);
+    h->field_70 = GU_SWAP32(h->field_70);
+    h->field_74 = GU_SWAP32(h->field_74);
+    h->field_78 = GU_SWAP32(h->field_78);
+    h->field_7C = GU_SWAP32(h->field_7C);
+}
+#endif
 #include "General/stdColor.h"
 #include "General/stdString.h"
 #include "Win95/stdDisplay.h"
@@ -65,7 +103,6 @@ int stdBitmap_EnsureData(stdBitmap *pBitmap) {
     }
     stdString_SafeStrCopy(tmp, pBitmap->fpath_full, 128);
     stdBitmap_FreeEntry(pBitmap);
-    stdPlatform_Printf("stdBitmap: Ensuring data for: `%s`\n", tmp);
     return stdBitmap_LoadEntry(tmp, pBitmap, 1, 0, 0); // TODO
 #endif
 }
@@ -150,6 +187,9 @@ int stdBitmap_LoadEntryFromFile(intptr_t fp, stdBitmap *out, int bCreateDDrawSur
     _memset(&out->field_20, 0, sizeof(stdBitmap)-offsetof(stdBitmap, field_20));
 
     std_pHS->fileRead(fp, &bmp_header, sizeof(bitmapHeader));
+#ifdef TARGET_N64
+    stdBitmap_SwapHeader(&bmp_header);
+#endif
     if ( _memcmp((const char *)&bmp_header, "BM  ", 4u) )
     {
         stdPrintf(std_pHS->errorPrint, ".\\General\\stdBitmap.c", 213, "Error: Bad signature in header of bitmap file.\n", 0, 0, 0, 0);
@@ -191,6 +231,10 @@ int stdBitmap_LoadEntryFromFile(intptr_t fp, stdBitmap *out, int bCreateDDrawSur
     for (mipCount = 0; mipCount < out->numMips; mipCount++)
     {
         std_pHS->fileRead(fp, v21, 8);
+#ifdef TARGET_N64
+        v21[0] = GU_SWAP32(v21[0]);
+        v21[1] = GU_SWAP32(v21[1]);
+#endif
         vbufTexFmt.height = v21[1];
         vbufTexFmt.width = v21[0];
 
@@ -357,7 +401,6 @@ int stdBitmap_UnloadData(stdBitmap* pBitmap) {
 #ifdef STDBITMAP_PARTIAL_LOAD
     if (!pBitmap || !pBitmap->bLoaded) return 0;
 
-    stdPlatform_Printf("stdBitmap: Unloading data for `%s`\n", pBitmap->fpath_full);
     stdBitmap_FreeEntry(pBitmap);
     pBitmap->bLoaded = 0;
 #endif

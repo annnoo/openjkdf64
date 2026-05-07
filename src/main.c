@@ -1,6 +1,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
+
 #include "hook.h"
 #include "jk.h"
 #include "types.h"
@@ -562,6 +566,16 @@ int main(int argc, char** argv)
 
 
 #endif
+
+#ifdef TARGET_N64
+    debug_init_isviewer();
+    dfs_init(DFS_DEFAULT_LOCATION);
+    display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE);
+    rdpq_init();
+    audio_init(22050, 4);
+    joypad_init();
+#endif // TARGET_N64
+
 #ifdef WIN64_STANDALONE
     int skipConsoleWindow = 0;
     if ((SDL_GetHintBoolean("SteamClientLaunch", 0) || SDL_GetHintBoolean("SteamOS", 0) || SDL_GetHintBoolean("SteamDeck", 0)) && SDL_GetHintBoolean("SteamGamepadUI", 0)) {
@@ -599,7 +613,7 @@ int main(int argc, char** argv)
     }
 #endif // WIN64_STANDALONE
 
-#if !defined(ARCH_WASM) && !defined(TARGET_ANDROID) && !defined(TARGET_TWL)
+#if !defined(ARCH_WASM) && !defined(TARGET_ANDROID) && !defined(TARGET_TWL) && !defined(TARGET_N64)
     openjkdf2_pExecutablePath = argv[0];
 #endif // !ARCH_WASM
 
@@ -661,7 +675,9 @@ int main(int argc, char** argv)
     PHYSFS_permitSymbolicLinks(0);
 #endif
 
+#ifndef TARGET_N64
     getcwd(openjkdf2_aOrigCwd, sizeof(openjkdf2_aOrigCwd));
+#endif
 
     openjkdf2_bOrigWasDF2 = 1;
     for (int i = 1; i < argc; i++) {
@@ -713,7 +729,9 @@ int main(int argc, char** argv)
             }
             else {
                 openjkdf2_bSkipWorkingDirData = 0;
+#ifndef TARGET_N64
                 chdir(openjkdf2_aOrigCwd);
+#endif
             }
         }
 

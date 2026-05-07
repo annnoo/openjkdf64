@@ -334,7 +334,7 @@ int32_t jkGuiRend_DisplayAndReturnClicked(jkGuiMenu *menu)
         { 
             // Added: this makes the menu that appears when pressing ESC in jkGUISingleTally flicker,
             //        I think due to how we handle window message emulation.
-#if !defined(SDL2_RENDER) && !defined(TARGET_TWL)
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
             menu->lastClicked = -1;
 #endif
         }

@@ -381,6 +381,9 @@ int jkRes_LoadCD(int cdNumberNeeded)
 #ifdef TARGET_TWL
         v23 = 1;
 #endif
+#ifdef TARGET_N64
+        v23 = 1;
+#endif
         
         if ( v23 )
         {

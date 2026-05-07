@@ -11,12 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifndef _WIN32
+#ifndef TARGET_N64
 #include <dirent.h>
+#endif
 #include <unistd.h>
 #endif
 #include <sys/stat.h>
 #ifndef _WIN32
-#ifndef TARGET_TWL
+#if !defined(TARGET_TWL) && !defined(TARGET_N64)
 #include <ftw.h>
 #endif
 #endif
@@ -243,6 +245,7 @@ LABEL_7:
 
 #ifdef PLATFORM_POSIX
 
+#ifndef TARGET_N64
 // Stolen from https://stackoverflow.com/questions/2256945/removing-a-non-empty-directory-programmatically-in-c-or-c
 static int rmFiles(const char *pathname, const struct stat *sbuf, int type, struct FTW *ftwb)
 {
@@ -253,10 +256,14 @@ static int rmFiles(const char *pathname, const struct stat *sbuf, int type, stru
     }
     return 0;
 }
+#endif // !TARGET_N64
 
 #ifndef _WIN32
 int stdFileUtil_Deltree(const char* lpPathName)
 {
+#ifdef TARGET_N64
+    return 0;
+#else
     char tmp[512];
     size_t len = _strlen(lpPathName);
 
@@ -274,7 +281,7 @@ int stdFileUtil_Deltree(const char* lpPathName)
     }
 #endif
 
-#ifndef TARGET_TWL
+#if !defined(TARGET_TWL)
     nftw(tmp, rmFiles, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS);
 #else
     DIR *dir;
@@ -320,11 +327,24 @@ int stdFileUtil_Deltree(const char* lpPathName)
 
     //rmdir(tmp);
     return 0;
+#endif // TARGET_N64
 }
 #endif // _WIN32
 #endif // PLATFORM_POSIX
 
-#if defined(PLATFORM_POSIX) && !defined(WIN32)
+#if defined(TARGET_N64)
+
+int stdFileUtil_FindNext(stdFileSearch *a1, stdFileSearchResult *a2) { return 0; }
+void stdFileUtil_DisposeFind(stdFileSearch *search) { if (search) std_pHS->free(search); }
+void stdFileUtil_FindReset(stdFileSearch *search) {}
+int stdFileUtil_FindQuick(const char *path, int type, const char *extension, stdFileSearchResult *result) { return 0; }
+int stdFileUtil_CountMatches(const char *path, int type, const char *extension) { return 0; }
+int stdFileUtil_DirExists(const char *path) { return 0; }
+void stdFileUtil_RmDir(const char *path) {}
+int stdFileUtil_MkDir(char *path) { return 0; }
+int stdFileUtil_DelFile(char *lpFileName) { return 0; }
+
+#elif defined(PLATFORM_POSIX) && !defined(WIN32)
 
 static char* search_ext = "";
 
@@ -561,4 +581,4 @@ int stdFileUtil_DelFile(char* lpFileName)
 
     return 1;
 }
-#endif // PLATFORM_POSIX
+#endif // TARGET_N64 / PLATFORM_POSIX

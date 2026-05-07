@@ -22,8 +22,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#ifndef TARGET_N64
 #include "smacker.h"
 #include "smush.h"
+#endif
 #ifdef __cplusplus
 }
 #endif
@@ -37,11 +39,13 @@ extern "C" {
 // TODO read back the number of queued buffers instead of being wasteful
 #define AUDIO_NUM_STDBUFS (32)
 
+#ifndef TARGET_N64
 static smush_ctx* jkCutscene_pSmush;
 static smk jkCutscene_smk;
 static int jkCutscene_bSmkValid = 0;
 static flex64_t jkCutscene_smk_usf;
 static uint32_t jkCutscene_smk_w, jkCutscene_smk_h, jkCutscene_smk_frames;
+#endif
 static stdVBuffer* jkCutscene_frameBuf = NULL;
 //static void* jkCutscene_audioBuf = NULL;
 static stdSound_buffer_t* jkCutscene_audio[AUDIO_NUM_STDBUFS];

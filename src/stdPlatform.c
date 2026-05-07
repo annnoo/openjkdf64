@@ -29,33 +29,50 @@
 #ifdef TARGET_N64
 static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
 {
-    // DFS is read-only, we only support "r" modes
+    // DFS is read-only
     if (mode[0] != 'r') return 0;
 
-    // DFS paths are absolute or relative to root.
-    // OpenJKDF2 often uses backslashes, convert to forward slashes.
+    // dfs_open needs an absolute path: /ui/sft/small0.sft
+    // Convert backslashes, lowercase, and ensure leading slash.
     char tmp[256];
-    size_t i;
-    for (i = 0; i < 255 && fpath[i]; i++) {
-        if (fpath[i] == '\\') tmp[i] = '/';
-        else tmp[i] = fpath[i];
+    int src = 0, dst = 0;
+
+    // Skip any "rom:/" prefix the caller might have added
+    if (fpath[0]=='r' && fpath[1]=='o' && fpath[2]=='m' && fpath[3]==':' && fpath[4]=='/') {
+        src = 5;
     }
-    tmp[i] = 0;
+
+    // Ensure leading slash
+    if (fpath[src] != '/') tmp[dst++] = '/';
+
+    for (; fpath[src] && dst < 254; src++, dst++) {
+        char c = fpath[src];
+        if (c == '\\') c = '/';
+        else c = tolower((unsigned char)c);
+        tmp[dst] = c;
+    }
+    tmp[dst] = 0;
 
     int handle = dfs_open(tmp);
-    if (handle < 0) return 0;
-    
-    return (stdFile_t)handle;
+    if (handle < 0) {
+        debugf("[N64_fileOpen] dfs_open(\"%s\") FAILED: %s\n", tmp, dfs_strerror(handle));
+        return 0;
+    }
+    debugf("[N64_fileOpen] dfs_open(\"%s\") OK handle=%d\n", tmp, handle);
+    return (stdFile_t)(uintptr_t)handle;
 }
 
 static int N64_stdFileClose(stdFile_t fhand)
 {
-    return dfs_close((uint32_t)fhand);
+    return dfs_close((uint32_t)(uintptr_t)fhand);
 }
 
 static size_t N64_stdFileRead(stdFile_t fhand, void* dst, size_t len)
 {
-    int ret = dfs_read(dst, 1, len, (uint32_t)fhand);
+    int ret = dfs_read(dst, 1, len, (uint32_t)(uintptr_t)fhand);
+    if (len <= 40) debugf("[N64_fileRead] handle=%u len=%u ret=%d first4=%02x%02x%02x%02x\n",
+        (uint32_t)(uintptr_t)fhand, (uint32_t)len, ret,
+        ((uint8_t*)dst)[0], ((uint8_t*)dst)[1], ((uint8_t*)dst)[2], ((uint8_t*)dst)[3]);
     return (ret < 0) ? 0 : (size_t)ret;
 }
 
@@ -66,11 +83,10 @@ static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
 
 static const char* N64_stdFileGets(stdFile_t fhand, char* dst, size_t len)
 {
-    // Simplified gets using dfs_read one by one
     size_t i = 0;
     char c;
     while (i < len - 1) {
-        if (dfs_read(&c, 1, 1, (uint32_t)fhand) <= 0) break;
+        if (dfs_read(&c, 1, 1, (uint32_t)(uintptr_t)fhand) <= 0) break;
         dst[i++] = c;
         if (c == '\n') break;
     }
@@ -80,22 +96,22 @@ static const char* N64_stdFileGets(stdFile_t fhand, char* dst, size_t len)
 
 static int N64_stdFseek(stdFile_t fhand, int a, int b)
 {
-    return dfs_seek((uint32_t)fhand, a, b);
+    return dfs_seek((uint32_t)(uintptr_t)fhand, a, b);
 }
 
 static int N64_stdFtell(stdFile_t fhand)
 {
-    return dfs_tell((uint32_t)fhand);
+    return dfs_tell((uint32_t)(uintptr_t)fhand);
 }
 
 static int N64_stdFeof(stdFile_t fhand)
 {
-    return dfs_eof((uint32_t)fhand);
+    return dfs_eof((uint32_t)(uintptr_t)fhand);
 }
 
 uint32_t N64_TimeMs()
 {
-    return (uint32_t)(timer_ticks_to_ms(timer_get_ticks()));
+    return (uint32_t)TICKS_TO_MS(timer_ticks());
 }
 #endif
 
@@ -107,6 +123,8 @@ uint32_t Linux_TimeMs()
     //16756
     //return (uint32_t)(((TIMER1_DATA*(1<<16))+TIMER0_DATA)/32.7285);
     return (uint32_t)(((uint64_t)((TIMER1_DATA*(1<<16))+TIMER0_DATA)<<9)/16757);
+#elif defined(TARGET_N64)
+    return N64_TimeMs();
 #else
 
     struct timespec _t;
@@ -126,6 +144,8 @@ uint64_t Linux_TimeUs()
 #if defined(TARGET_TWL)
     //return (uint64_t)((flex64_t)((TIMER1_DATA*(1<<16))+TIMER0_DATA)/0.0327285);
     return (uint64_t)(((uint64_t)((TIMER1_DATA*(1<<16))+TIMER0_DATA)<<19)/17159);
+#elif defined(TARGET_N64)
+    return (uint64_t)N64_TimeMs() * 1000;
 #else
     struct timespec _t;
 
@@ -875,9 +895,13 @@ int stdPlatform_Printf(const char *fmt, ...)
     SDL_LockMutex(stdPlatform_mtxPrintf);
 #endif
     
-    va_start (args, fmt);
+    va_start(args, fmt);
+#ifdef TARGET_N64
+    int ret = vfprintf(stderr, fmt, args);
+#else
     int ret = vprintf(fmt, args);
-    va_end (args);
+#endif
+    va_end(args);
 
 #ifdef QUAKE_CONSOLE
     va_start (args, fmt);

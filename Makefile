@@ -1,19 +1,35 @@
 V=1
-SOURCE_DIR=src
-BUILD_DIR=build
+BUILD_DIR=build/n64
+SOURCE_DIR=.
+
 include $(N64_INST)/include/n64.mk
 
-all: hello.z64
-.PHONY: all
+N64_ROM_TITLE="OpenJKDF2"
 
-OBJS = $(BUILD_DIR)/main.o
+# ── Minimal boot ROM ──────────────────────────────────────────────────────────
+# Only compile main_n64.c for now.
+# Goal: get a clean .z64 that boots and displays text.
+# Engine files will be added incrementally after this works.
 
-hello.z64: N64_ROM_TITLE="Hello World"
+SRCS := src/main_n64.c
 
-$(BUILD_DIR)/hello.elf: $(OBJS)
+OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
+
+# ── Compile flags ─────────────────────────────────────────────────────────────
+
+CFLAGS += \
+    -DTARGET_N64 \
+    -Isrc
+
+# ── Top-level targets ─────────────────────────────────────────────────────────
+
+.PHONY: all clean
+
+all: openjkdf2.z64
+
+openjkdf2.z64: N64_ROM_TITLE="OpenJKDF2"
+
+$(BUILD_DIR)/openjkdf2.elf: $(OBJS)
 
 clean:
-	rm -f $(BUILD_DIR)/* *.z64
-.PHONY: clean
-
--include $(wildcard $(BUILD_DIR)/*.d)
+	rm -rf $(BUILD_DIR) openjkdf2.z64

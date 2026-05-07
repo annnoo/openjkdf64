@@ -80,9 +80,11 @@ static sithWorldProgressCallback_t sithWorld_LoadPercentCallback;
 int sithWorld_Startup()
 {
     sithWorld_numParsers = 0;
-    sithWorld_SetSectionParser("georesource", sithWorld_LoadGeoresource);
     sithWorld_SetSectionParser("copyright", sithCopyright_Load);
     sithWorld_SetSectionParser("header", sithHeader_Load);
+#ifndef TARGET_N64
+    // N64: skip all subsystems until each is individually ported
+    sithWorld_SetSectionParser("georesource", sithWorld_LoadGeoresource);
     sithWorld_SetSectionParser("sectors", sithSector_Load);
     sithWorld_SetSectionParser("models", sithModel_Load);
     sithWorld_SetSectionParser("sprites", sithSprite_Load);
@@ -99,6 +101,7 @@ int sithWorld_Startup()
 #ifdef JKM_LIGHTING
     sithWorld_SetSectionParser("archlighting", sithArchLighting_ParseSection); // MOTS added
 #endif
+#endif // TARGET_N64
     sithWorld_bInitted = 1;
     return 1;
 }

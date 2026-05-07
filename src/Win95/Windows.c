@@ -79,7 +79,7 @@ void Windows_Shutdown()
 
 int Windows_InitWindow()
 {
-#if defined(SDL2_RENDER) || defined(TARGET_TWL)
+#if defined(SDL2_RENDER) || defined(TARGET_TWL) || defined(TARGET_N64)
     return 1;
 #endif
     HDC v2; // esi

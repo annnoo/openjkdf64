@@ -38,3 +38,8 @@ void rdActive_ClearFrameCounters()
 {
     rdActive_drawnFaces = 0;
 }
+
+void rdActive_DrawScene(void)
+{
+    // Software rasterizer draw scene — stub for N64 (3D gameplay not yet implemented)
+}

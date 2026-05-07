@@ -16,6 +16,7 @@
 int rdActive_Startup();
 void rdActive_AdvanceFrame();
 void rdActive_ClearFrameCounters();
+void rdActive_DrawScene(void);
 
 //static int (*rdActive_Startup)(void) = (void*)rdActive_Startup_ADDR;
 //static void (*__cdecl rdActive_AdvanceFrame)(void) = (void*)rdActive_AdvanceFrame_ADDR;

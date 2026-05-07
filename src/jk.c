@@ -2,13 +2,17 @@
 
 #include "types.h"
 
-#if defined(LINUX) || defined(TARGET_TWL)
+#if defined(LINUX) || defined(TARGET_TWL) || defined(TARGET_N64)
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
 //#include <wchar.h>
+#endif
+
+#ifdef TARGET_N64
+#include <libdragon.h>
 #endif
 
 #ifdef MACOS
@@ -711,9 +715,13 @@ void __wrap_exit(int res) {
 int jk_printf(const char* fmt, ...)
 {
     va_list args;
-    va_start (args, fmt);
+    va_start(args, fmt);
+#ifdef TARGET_N64
+    int ret = vfprintf(stderr, fmt, args);
+#else
     int ret = vprintf(fmt, args);
-    va_end (args);
+#endif
+    va_end(args);
     return ret;
 }
 

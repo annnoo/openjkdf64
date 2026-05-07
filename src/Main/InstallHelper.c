@@ -1119,6 +1119,12 @@ void InstallHelper_SetCwd()
 }
 
 #else
+#ifdef TARGET_N64
+void InstallHelper_SetCwd()
+{
+    // N64: no filesystem chdir — DFS paths are absolute
+}
+#else
 void InstallHelper_SetCwd()
 {
 #if defined(TARGET_ANDROID)
@@ -1152,4 +1158,5 @@ void InstallHelper_SetCwd()
 
     stdPlatform_Printf("Running from: %s\n", tmpCwd);
 }
+#endif // TARGET_N64
 #endif // defined(SDL2_RENDER) && !defined(ARCH_WASM) && !defined(TARGET_ANDROID)

@@ -9,6 +9,32 @@
 #include "Platform/std3D.h"
 #include "World/jkPlayer.h"
 #include "General/stdString.h"
+#include "n64_endian.h"
+
+#ifdef TARGET_N64
+static inline void stdFont_SwapHeader(stdFontHeader *h) {
+    // magic is compared as bytes (memcmp), no swap needed
+    h->version     = GU_SWAP32(h->version);
+    h->marginY     = GU_SWAP32(h->marginY);
+    h->marginX     = GU_SWAP32(h->marginX);
+    h->field_10    = GU_SWAP32(h->field_10);
+    h->numCharsets = GU_SWAP32(h->numCharsets);
+    h->field_18    = GU_SWAP32(h->field_18);
+    h->field_1C    = GU_SWAP32(h->field_1C);
+    h->field_20    = GU_SWAP32(h->field_20);
+    h->field_24    = GU_SWAP32(h->field_24);
+}
+static inline void stdFont_SwapExtHeader(stdFontExtHeader *h) {
+    h->characterFirst = GU_SWAP16(h->characterFirst);
+    h->characterLast  = GU_SWAP16(h->characterLast);
+}
+static inline void stdFont_SwapEntries(stdFontEntry *entries, int count) {
+    for (int i = 0; i < count; i++) {
+        entries[i].glyphTexX  = GU_SWAP32(entries[i].glyphTexX);
+        entries[i].glyphWidth = GU_SWAP32(entries[i].glyphWidth);
+    }
+}
+#endif
 
 #define INT_FLOAT_SCALED(x, s) ((int)((flex_t)(x) * (flex_t)(s))) // FLEXTODO
 
@@ -73,14 +99,22 @@ stdFont* stdFont_Load(char *fpath, int a2, int a3)
 
     if ( std_pHS->fileRead(fd, &header, 0x28) != 40 )
         goto LABEL_28;
+#ifdef TARGET_N64
+    stdFont_SwapHeader(&header);
+#endif
     if ( _memcmp(&header, "SFNT", 4u) )
         return 0;
     if ( header.version != 10 )
         return 0;
+
     if ( std_pHS->fileRead(fd, &extHeader, 4) != 4 )
         goto LABEL_28;
+#ifdef TARGET_N64
+    stdFont_SwapExtHeader(&extHeader);
+#endif
     charLast = extHeader.characterLast;
     charFirst = extHeader.characterFirst;
+
     header_field_10 = header.field_10;
     marginX = header.marginX;
     totalAlloc = sizeof(stdFontEntry) * (extHeader.characterLast - extHeader.characterFirst) + sizeof(stdFont);
@@ -112,11 +146,17 @@ stdFont* stdFont_Load(char *fpath, int a2, int a3)
     charMax = fontAlloc_->charsetHead.charLast;
     if ( std_pHS->fileRead(fd, pEntries, sizeof(stdFontEntry) * (charMax - charMin + 1)) != sizeof(stdFontEntry) * (charMax - charMin + 1) )
         goto LABEL_28;
+#ifdef TARGET_N64
+            stdFont_SwapEntries(pEntries, charMax - charMin + 1);
+#endif
     fpatha = 1;
     if ( header.numCharsets > 1 )
     {
         while ( std_pHS->fileRead(fd, &extHeader, 4) == 4 )
         {
+#ifdef TARGET_N64
+            stdFont_SwapExtHeader(&extHeader);
+#endif
             charLast_1 = extHeader.characterLast;
             charFirsta = extHeader.characterFirst;
             lastCharset = &fontAlloc_->charsetHead;
@@ -142,6 +182,9 @@ stdFont* stdFont_Load(char *fpath, int a2, int a3)
             {
                 break;
             }
+#ifdef TARGET_N64
+            stdFont_SwapEntries(charset->pEntries, charset->charLast - charset->charFirst + 1);
+#endif
             if ( ++fpatha >= header.numCharsets )
                 goto LABEL_21;
         }
@@ -151,6 +194,7 @@ LABEL_28:
     }
 LABEL_21:
     bitmap = stdBitmap_LoadFromFile(fd, a2, a3);
+
     fontAlloc_->pBitmap = bitmap;
     if ( bitmap )
     {

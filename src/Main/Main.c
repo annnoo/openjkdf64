@@ -412,7 +412,9 @@ int Main_Startup(const char *cmdline)
         jkGuiMods_Startup();
 #endif
 #ifndef LINUX_TMP
+#ifndef TARGET_N64
         smack_Startup(); // TODO
+#endif
 #endif
         sithMain_Startup(&hs); // ~TODO
         jkAI_Startup();
@@ -517,7 +519,9 @@ void Main_Shutdown()
     jkDev_Shutdown();
     sithMain_Shutdown();
 #ifndef LINUX_TMP
+#ifndef TARGET_N64
     smack_Shutdown();
+#endif
 #endif
     jkGui_Shutdown();
     rdShutdown();

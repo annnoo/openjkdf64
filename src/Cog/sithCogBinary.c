@@ -7,6 +7,7 @@
 #include "stdPlatform.h"
 #include "Cog/sithCogParse.h"
 #include "General/stdHashTable.h"
+#include "General/crc32.h"
 
 /*
  * sithCogBinary_Load -- load a pre-compiled .bcog file into *script.
@@ -63,8 +64,10 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
             sym->symbol_id    = bs.symbol_id;
             sym->val.type     = bs.val_type;
             sym->val.data[0]  = bs.val_data[0];
+#ifndef COG_COMPRESS_VAR_SIZE
             sym->val.data[1]  = bs.val_data[1];
             sym->val.data[2]  = bs.val_data[2];
+#endif
             sym->field_14     = bs.field_14;
 
             /* copy name into heap-allocated buffer */
@@ -72,9 +75,14 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
             if (!nameBuf)
                 goto fail;
             _strcpy(nameBuf, bs.name);
+#ifndef COG_CRC32_SYMBOL_NAMES
             sym->pName = nameBuf;
-
             stdHashTable_SetKeyVal(table->hashtable, sym->pName, sym);
+#else
+            sym->nameCrc = stdCrc32(nameBuf, strlen(nameBuf));
+            stdHashTable_SetKeyVal(table->hashtable, nameBuf, sym);
+            pSithHS->free(nameBuf);
+#endif
         }
     }
 
