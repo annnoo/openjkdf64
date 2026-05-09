@@ -82,8 +82,6 @@ int sithWorld_Startup()
     sithWorld_numParsers = 0;
     sithWorld_SetSectionParser("copyright", sithCopyright_Load);
     sithWorld_SetSectionParser("header", sithHeader_Load);
-#ifndef TARGET_N64
-    // N64: skip all subsystems until each is individually ported
     sithWorld_SetSectionParser("georesource", sithWorld_LoadGeoresource);
     sithWorld_SetSectionParser("sectors", sithSector_Load);
     sithWorld_SetSectionParser("models", sithModel_Load);
@@ -101,7 +99,6 @@ int sithWorld_Startup()
 #ifdef JKM_LIGHTING
     sithWorld_SetSectionParser("archlighting", sithArchLighting_ParseSection); // MOTS added
 #endif
-#endif // TARGET_N64
     sithWorld_bInitted = 1;
     return 1;
 }
@@ -169,6 +166,7 @@ int sithWorld_Load(sithWorld *pWorld, char *map_jkl_fname)
         {
             if ( _sscanf(stdConffile_aLine, " section: %s", section) == 1 )
             {
+                stdPlatform_Printf("sithWorld_Load: Found section '%s' (line='%s')\n", section, stdConffile_aLine);
                 v3 = 0;
                 if ( sithWorld_numParsers <= 0 )
                 {
@@ -188,20 +186,19 @@ LABEL_11:
                 }
                 if ( v3 != -1 )
                 {
+                    stdPlatform_Printf("sithWorld_Load: Starting to parse section %s...\n", section);
                     startMsecs = stdPlatform_GetTimeMsec();
                     if ( !sithWorld_aSectionParsers[v3].funcptr(pWorld, 0) ) {
-                        // Added
-                        _sprintf(tmp, "%f seconds to parse section %s -- FAILED!\n", (flex32_t)v6 * 0.001, section);
-                        sithConsole_Print(tmp);
-#ifdef TARGET_TWL
+                        v6 = (unsigned int)(stdPlatform_GetTimeMsec() - startMsecs);
+                        stdPlatform_Printf("%f seconds to parse section %s -- FAILED!\n", (flex32_t)v6 * 0.001, section);
+#if defined(TARGET_TWL) || defined(TARGET_N64)
                         stdPlatform_PrintHeapStats();
 #endif
                         goto LABEL_19;
                     }
                     v6 = (unsigned int)(stdPlatform_GetTimeMsec() - startMsecs);
-                    _sprintf(tmp, "%f seconds to parse section %s.\n", (flex32_t)v6 * 0.001, section);
-                    sithConsole_Print(tmp);
-#ifdef TARGET_TWL
+                    stdPlatform_Printf("%f seconds to parse section %s.\n", (flex32_t)v6 * 0.001, section);
+#if defined(TARGET_TWL) || defined(TARGET_N64)
                     stdPlatform_PrintHeapStats();
 #endif
                 }
