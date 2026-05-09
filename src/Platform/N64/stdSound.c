@@ -111,20 +111,28 @@ uint32_t stdSound_ParseWav(stdFile_t sound_file,
     stdWaveFormat v10;
     uint32_t seekPos;
 
-    // Check for wav64 first
+    // Check for wav64 first (signature is "WV64")
     std_pHS->fseek(sound_file, 0, 0);
     std_pHS->fileRead(sound_file, v9, 4);
-    if (!_memcmp(v9, "WAV6", 4)) {
-        // This is a wav64 file. Metadata is at known offsets.
-        // We'll use a temporary wav64_t to parse it if we could, 
-        // but for now let's just parse the bits we need.
-        uint32_t channels, frequency;
-        std_pHS->fseek(sound_file, 8, 0);
-        std_pHS->fileRead(sound_file, &channels, 4);
-        std_pHS->fileRead(sound_file, &frequency, 4);
+    if (!_memcmp(v9, "WV64", 4)) {
+        // This is a wav64 file. Header layout from wav64_internal.h:
+        // char id[4]; (0-3)
+        // int8_t version; (4)
+        // int8_t format; (5)
+        // int8_t channels; (6)
+        // int8_t nbits; (7)
+        // int32_t freq; (8-11)
+        // int32_t len; (12-15)
+        uint8_t channels, nbits;
+        int32_t freq;
         
-        *nSamplesPerSec = frequency;
-        *bitsPerSample = 16; // Most wav64 are 16-bit
+        std_pHS->fseek(sound_file, 6, 0);
+        std_pHS->fileRead(sound_file, &channels, 1);
+        std_pHS->fileRead(sound_file, &nbits, 1);
+        std_pHS->fileRead(sound_file, &freq, 4);
+        
+        *nSamplesPerSec = freq;
+        *bitsPerSample = nbits;
         *bStereo = (channels == 2);
         *seekOffset = 0xFFFFFFFF; // Special flag for wav64
         
@@ -231,7 +239,10 @@ stdSound_buffer_t* stdSound_BufferCreate(int bStereo, uint32_t nSamplesPerSec,
 stdSound_buffer_t* stdSound_BufferCreateFromHandle(stdFile_t fhand)
 {
     const char* path = N64_GetPathForHandle(fhand);
-    if (!path) return NULL;
+    if (!path || path[0] == 0 || (path[0] == '/' && path[1] == 0)) {
+        debugf("[N64] stdSound_BufferCreateFromHandle: invalid path\n");
+        return NULL;
+    }
 
     n64SoundBuf_t *nb = (n64SoundBuf_t*)malloc(sizeof(n64SoundBuf_t));
     if (!nb) return NULL;
@@ -244,7 +255,17 @@ stdSound_buffer_t* stdSound_BufferCreateFromHandle(stdFile_t fhand)
     else
         snprintf(romPath, sizeof(romPath), "rom:/%s", path);
 
+    // Some libdragon versions assert on file not found in wav64_open
+    // if it uses internal asset_open. Let's ensure it doesn't crash.
     wav64_open(&nb->wav64, romPath);
+    
+    // Check if the open actually succeeded by looking at the waveform frequency/len
+    if (nb->wav64.wave.frequency == 0) {
+        debugf("[N64] stdSound_BufferCreateFromHandle: FAILED to open %s\n", romPath);
+        free(nb);
+        return NULL;
+    }
+
     nb->is_wav64 = 1;
     nb->mixer_ch = -1;
     nb->vol      = 1.0f;

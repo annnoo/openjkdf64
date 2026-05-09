@@ -109,8 +109,6 @@ cmd_audio() {
             if [ -d "$ASSET_DIR/$subdir" ]; then
                 mkdir -p "$FS_DIR/$subdir"
                 # Raw WAV: engine opens these to parse + read PCM
-                find "$ASSET_DIR/$subdir" -name "*.wav" \
-                    -exec cp -u {} "$FS_DIR/$subdir/" \;
                 # Compressed wav64: available for future streaming/music use
                 find "$ASSET_DIR/$subdir" -name "*.wav64" \
                     -exec cp -u {} "$FS_DIR/$subdir/" \;

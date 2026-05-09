@@ -28,7 +28,41 @@
 
 #ifdef TARGET_N64
 #define MAX_DFS_HANDLES 128
-static char g_dfs_paths[MAX_DFS_HANDLES][128];
+typedef struct {
+    uint32_t handle;
+    char path[128];
+} DfsPathMap;
+static DfsPathMap g_dfs_paths[MAX_DFS_HANDLES];
+
+static void N64_MapHandleToPath(uint32_t handle, const char* path) {
+    for (int i = 0; i < MAX_DFS_HANDLES; i++) {
+        if (g_dfs_paths[i].handle == 0) {
+            g_dfs_paths[i].handle = handle;
+            strncpy(g_dfs_paths[i].path, path, 127);
+            g_dfs_paths[i].path[127] = 0;
+            return;
+        }
+    }
+}
+
+static const char* N64_GetPathForHandleInternal(uint32_t handle) {
+    for (int i = 0; i < MAX_DFS_HANDLES; i++) {
+        if (g_dfs_paths[i].handle == handle) {
+            return g_dfs_paths[i].path;
+        }
+    }
+    return NULL;
+}
+
+static void N64_UnmapHandle(uint32_t handle) {
+    for (int i = 0; i < MAX_DFS_HANDLES; i++) {
+        if (g_dfs_paths[i].handle == handle) {
+            g_dfs_paths[i].handle = 0;
+            g_dfs_paths[i].path[0] = 0;
+            return;
+        }
+    }
+}
 
 static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
 {
@@ -77,10 +111,7 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
         return 0;
     }
 
-    if (handle < MAX_DFS_HANDLES) {
-        strncpy(g_dfs_paths[handle], tmp, 127);
-        g_dfs_paths[handle][127] = 0;
-    }
+    N64_MapHandleToPath((uint32_t)handle, tmp);
 
     debugf("[N64_fileOpen] dfs_open(\"%s\") OK handle=%d\n", tmp, handle);
     return (stdFile_t)(uintptr_t)handle;
@@ -88,19 +119,12 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
 
 const char* N64_GetPathForHandle(stdFile_t fhand)
 {
-    int handle = (int)(uintptr_t)fhand;
-    if (handle >= 0 && handle < MAX_DFS_HANDLES) {
-        return g_dfs_paths[handle];
-    }
-    return NULL;
+    return N64_GetPathForHandleInternal((uint32_t)(uintptr_t)fhand);
 }
 
 static int N64_stdFileClose(stdFile_t fhand)
 {
-    int handle = (int)(uintptr_t)fhand;
-    if (handle >= 0 && handle < MAX_DFS_HANDLES) {
-        g_dfs_paths[handle][0] = 0;
-    }
+    N64_UnmapHandle((uint32_t)(uintptr_t)fhand);
     return dfs_close((uint32_t)(uintptr_t)fhand);
 }
 

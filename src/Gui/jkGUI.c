@@ -186,10 +186,10 @@ void jkGui_SmolScreenFixup(jkGuiMenu *menu, BOOL bForce) {
         int32_t dirtyWidth = iter->rect.width;
         int32_t dirtyHeight = iter->rect.height;
 
-        iter->rect.x = ((int)(flex_t)iter->rect.x * (flex_t)0.4);
-        iter->rect.y = ((int)(flex_t)iter->rect.y * (flex_t)0.4);
-        iter->rect.width = ((int)(flex_t)iter->rect.width * (flex_t)0.4);
-        iter->rect.height = ((int)(flex_t)iter->rect.height * (flex_t)0.4);
+        iter->rect.x = ((int)(flex_t)iter->rect.x * (flex_t)0.5);
+        iter->rect.y = ((int)(flex_t)iter->rect.y * (flex_t)0.5);
+        iter->rect.width = ((int)(flex_t)iter->rect.width * (flex_t)0.5);
+        iter->rect.height = ((int)(flex_t)iter->rect.height * (flex_t)0.5);
 
         if ((iter->type == ELEMENT_TEXTBUTTON || iter->type == ELEMENT_TEXT)) {
             iter->textType = 12;

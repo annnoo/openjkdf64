@@ -76,9 +76,12 @@ void Window_Main_Loop(void)
     n64_frame_end();
 }
 
+extern void jkGuiRend_DebugTick();
+
 int Window_MessageLoop(void)
 {
     jkGuiRend_UpdateController();
+    jkGuiRend_DebugTick();
 
     // stdControl_ReadControls() (called inside UpdateController) already polls
     // joypad. Read Start here for the Escape shortcut.
@@ -91,6 +94,12 @@ int Window_MessageLoop(void)
 
     Window_msg_main_handler(g_hWnd, WM_PAINT, 0, 0);
     Window_SdlUpdate();
+    
+    // If we are in a menu loop, Window_Main_Loop's n64_frame_end won't be reached.
+    // Force a frame end here to show the menu.
+    n64_frame_end();
+    n64_frame_begin();
+
     return 0;
 }
 

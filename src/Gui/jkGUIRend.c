@@ -824,6 +824,32 @@ int32_t jkGuiRend_ElementHasHoverSound(jkGuiElement *element)
     return 0;
 }
 
+void jkGuiRend_DebugTick()
+{
+    static uint32_t lastUpdate = 0;
+    uint32_t now = stdPlatform_GetTimeMsec();
+    if (now - lastUpdate < 1000) return;
+    lastUpdate = now;
+
+    if (!jkGuiRend_activeMenu) return;
+
+    for (int i = 0; i < 20; i++) {
+        jkGuiElement* element = &jkGuiRend_activeMenu->paElements[i];
+        if (element->type == ELEMENT_END) break;
+
+        if ((element->type == ELEMENT_TEXT || element->type == ELEMENT_TEXTBUTTON) && element->wstr) {
+            static int charIdx = 0;
+            wchar_t* wstr = (wchar_t*)element->wstr;
+            if (wstr[0]) {
+                wstr[0] = L'0' + (charIdx % 10);
+                charIdx++;
+                jkGuiRend_UpdateAndDrawClickable(element, jkGuiRend_activeMenu, 1);
+                break;
+            }
+        }
+    }
+}
+
 void jkGuiRend_UpdateAndDrawClickable(jkGuiElement *clickable, jkGuiMenu *menu, BOOL forceRedraw)
 {
     rdVector2i mousePos;

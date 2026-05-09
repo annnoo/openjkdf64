@@ -203,21 +203,23 @@ int stdDisplay_VBufferCopy(stdVBuffer *vbuf, stdVBuffer *vbuf2, unsigned int bli
 
     if (scale2x) {
         // Scaled blit: one dst pixel per 2x2 src block.
-        // dstRect dimensions in dst coords; iterate over dst pixels.
-        int dstW = vbuf->format.width  - (int)blit_x;
-        int dstH = vbuf->format.height - (int)blit_y;
-        if (dstW <= 0 || dstH <= 0) return 1;
-
+        // The destination region is (blit_x, blit_y) with size (rect->width, rect->height).
+        // The source region is (rect->x * 2, rect->y * 2) with size (rect->width * 2, rect->height * 2).
         int has_alpha = (alpha_maybe & 1);
-        for (int j = 0; j < dstH; j++) {
-            int srcJ = srcRect.y + j * 2;
+        for (int j = 0; j < rect->height; j++) {
+            int srcJ = (rect->y + j) * 2;
             if ((uint32_t)srcJ >= (uint32_t)vbuf2->format.height) break;
-            for (int i = 0; i < dstW; i++) {
-                int srcI = srcRect.x + i * 2;
+            for (int i = 0; i < rect->width; i++) {
+                int srcI = (rect->x + i) * 2;
                 if ((uint32_t)srcI >= (uint32_t)vbuf2->format.width) break;
                 uint8_t pixel = srcPixels[srcI + srcJ * srcStride];
                 if (!pixel && has_alpha) continue;
-                dstPixels[(i + blit_x) + (j + blit_y) * dstStride] = pixel;
+                
+                uint32_t dstX = blit_x + i;
+                uint32_t dstY = blit_y + j;
+                if (dstX >= vbuf->format.width || dstY >= vbuf->format.height) continue;
+                
+                dstPixels[dstX + dstY * dstStride] = pixel;
             }
         }
         return 1;
