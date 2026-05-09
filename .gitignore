@@ -124,3 +124,4 @@ graphify-out/
 AGENTS.md.worktrees/
 .worktrees/
 build_linux64/*
+tools/out/*

@@ -94,6 +94,7 @@ macro(plat_initialize)
     include_directories(
         ${N64_INST}/mips64-elf/include
         ${N64_INST}/mips64-elf/include/newlib_overrides
+        ${CMAKE_SOURCE_DIR}/tiny3d/src
     )
     # Force-include ktls.h the same way n64.mk does
     add_compile_options(-include ktls.h)
@@ -114,6 +115,7 @@ macro(plat_link_and_package)
     set(N64_LD_SCRIPT  ${N64_INST}/mips64-elf/lib/n64.ld)
     set(LIBDRAGON_A    ${N64_INST}/mips64-elf/lib/libdragon.a)
     set(LIBDRAGONSYS_A ${N64_INST}/mips64-elf/lib/libdragonsys.a)
+    set(LIBT3D_A       ${CMAKE_SOURCE_DIR}/tiny3d/build/libt3d.a)
 
     set(ELF_FILE       ${CMAKE_BINARY_DIR}/${BIN_NAME})
     set(ELF_STRIPPED   ${CMAKE_BINARY_DIR}/openjkdf2.elf.stripped)
@@ -127,6 +129,7 @@ macro(plat_link_and_package)
     target_link_libraries(${BIN_NAME} PRIVATE
         ${LIBDRAGON_A}
         ${LIBDRAGONSYS_A}
+        ${LIBT3D_A}
         -lm -lc
     )
     target_link_libraries(sith_engine PRIVATE nlohmann_json::nlohmann_json)

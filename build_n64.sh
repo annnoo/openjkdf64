@@ -121,6 +121,40 @@ cmd_audio() {
     fi
 }
 
+cmd_sync_assets() {
+    local ASSET_DIR="$SCRIPT_DIR/tools/out"
+    local FS_DIR="$SCRIPT_DIR/filesystem"
+
+    info "Syncing level 1 assets to filesystem/..."
+    mkdir -p "$FS_DIR"
+
+    # Core UI and global assets
+    if [ -d "$ASSET_DIR/ui" ]; then
+        cp -ru "$ASSET_DIR/ui" "$FS_DIR/"
+    fi
+    if [ -d "$ASSET_DIR/misc" ]; then
+        cp -ru "$ASSET_DIR/misc" "$FS_DIR/"
+    fi
+
+    # Surgical inclusion for Level 1 (jedi.jkl)
+    # We include the jkl, and the whole directories for 3do/mat/cog for now
+    # as dependencies are complex to track manually.
+    for subdir in jkl 3do mat cog; do
+        if [ -d "$ASSET_DIR/$subdir" ]; then
+            mkdir -p "$FS_DIR/$subdir"
+            if [ "$subdir" == "jkl" ]; then
+                # Only include Level 1 JKL
+                cp -u "$ASSET_DIR/jkl/jedi.jkl" "$FS_DIR/jkl/" 2>/dev/null || warn "jedi.jkl not found"
+            else
+                # For 3do/mat/cog, we sync everything in tools/out
+                # (User should only extract what's needed to tools/out)
+                cp -ru "$ASSET_DIR/$subdir" "$FS_DIR/"
+            fi
+        fi
+    done
+    ok "Level 1 assets synced"
+}
+
 cmd_build() {
     check_libdragon
     libdragon start
@@ -132,6 +166,9 @@ cmd_build() {
 
     # Convert and sync audio assets before the ROM link
     cmd_audio
+
+    # Sync level 1 assets
+    cmd_sync_assets
 
     info "Building..."
     container "cmake --build build_n64 --parallel \$(nproc)"

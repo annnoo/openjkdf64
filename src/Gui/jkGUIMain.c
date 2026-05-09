@@ -136,6 +136,10 @@ void jkGuiMain_Show()
     jkGuiMain_elements[8].wstr = openjkdf2_waReleaseVersion;
     jkGuiMain_elements[9].wstr = openjkdf2_waReleaseCommitShort;
 
+#if defined(TARGET_N64) || defined(TARGET_TWL)
+    jkGuiMain_elements[3].bIsVisible = 0; // Hide GUI_CHOOSEPLAYER
+#endif
+
     // Added
     stdBitmap_EnsureData(jkGui_stdBitmaps[JKGUI_BM_BK_MAIN]);
 

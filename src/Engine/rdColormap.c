@@ -70,11 +70,21 @@ int rdColormap_LoadEntry(char *colormap_fname, rdColormap *colormap)
     stdString_SafeStrCopy(colormap->colormap_fname, stdFileFromPath(colormap_fname), 32);
 #endif
     rdroid_pHS->fileRead(colormap_fptr, &header, 0x40);
+
+    // Byte swap header
+    header.magic = le32_to_cpu(header.magic);
+    header.version = le32_to_cpu(header.version);
+    header.flags = le32_to_cpu(header.flags);
+    header.tint[0] = le32_to_cpu(header.tint[0]);
+    header.tint[1] = le32_to_cpu(header.tint[1]);
+    header.tint[2] = le32_to_cpu(header.tint[2]);
+
     colormap->tint.x = header.tint[0];
     colormap->flags = header.flags;
     colormap->tint.y = header.tint[1];
     colormap->tint.z = header.tint[2];
-    if ( _strncmp((const char *)&header.magic, "CMP ", 4u) )
+
+    if ( header.magic != 0x504D4320 ) // "CMP " in Little-Endian
     {
         jk_printf("CMP magic in `%s` is invalid!\n", colormap_fname);
         goto safe_fallback;

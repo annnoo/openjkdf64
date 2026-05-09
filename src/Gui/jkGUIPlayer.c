@@ -189,6 +189,16 @@ int jkGuiPlayer_sub_410640(Darray *array, jkGuiElement *element)
 
 void jkGuiPlayer_ShowNewPlayer(int a1)
 {
+#if defined(TARGET_N64) || defined(TARGET_TWL)
+    stdString_CharToWchar(jkPlayer_playerShortName, "Player", 31);
+    if (!jkPlayer_ReadConf(jkPlayer_playerShortName))
+    {
+        jkPlayer_setDiff = 1;
+        jkPlayer_CreateConf(jkPlayer_playerShortName);
+    }
+    return;
+#endif
+
     int v1; // eax
     int v2; // ebp
     jkGuiStringEntry *v3; // eax

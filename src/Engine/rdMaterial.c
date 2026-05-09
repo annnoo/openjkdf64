@@ -141,13 +141,33 @@ int rdMaterial_LoadEntry_Common(char *mat_fpath, rdMaterial *material, int creat
     }
 
     rdroid_pHS->fileRead(mat_file, &mat_header, sizeof(rdMaterialHeader));
-    if ( _memcmp(mat_header.magic, "MAT ", 4u) || mat_header.revision != '2' )
+    if ( _memcmp(mat_header.magic, "MAT ", 4u) || (mat_header.revision != '2' && le32_to_cpu(mat_header.revision) != '2') )
     {
         stdPlatform_Printf("OpenJKDF2: Material `%s` has improper magic or bad revision!\n", mat_fpath); // Added
         rdroid_pHS->fileClose(mat_file_);
 
         return 0;
     }
+
+    // Byte swap header
+    mat_header.revision = le32_to_cpu(mat_header.revision);
+    mat_header.type = le32_to_cpu(mat_header.type);
+    mat_header.num_texinfo = le32_to_cpu(mat_header.num_texinfo);
+    mat_header.num_textures = le32_to_cpu(mat_header.num_textures);
+    mat_header.texFormat.is16bit = le32_to_cpu(mat_header.texFormat.is16bit);
+    mat_header.texFormat.bpp = le32_to_cpu(mat_header.texFormat.bpp);
+    mat_header.texFormat.r_bits = le32_to_cpu(mat_header.texFormat.r_bits);
+    mat_header.texFormat.g_bits = le32_to_cpu(mat_header.texFormat.g_bits);
+    mat_header.texFormat.b_bits = le32_to_cpu(mat_header.texFormat.b_bits);
+    mat_header.texFormat.r_shift = le32_to_cpu(mat_header.texFormat.r_shift);
+    mat_header.texFormat.g_shift = le32_to_cpu(mat_header.texFormat.g_shift);
+    mat_header.texFormat.b_shift = le32_to_cpu(mat_header.texFormat.b_shift);
+    mat_header.texFormat.r_bitdiff = le32_to_cpu(mat_header.texFormat.r_bitdiff);
+    mat_header.texFormat.g_bitdiff = le32_to_cpu(mat_header.texFormat.g_bitdiff);
+    mat_header.texFormat.b_bitdiff = le32_to_cpu(mat_header.texFormat.b_bitdiff);
+    mat_header.texFormat.unk_40 = le32_to_cpu(mat_header.texFormat.unk_40);
+    mat_header.texFormat.unk_44 = le32_to_cpu(mat_header.texFormat.unk_44);
+    mat_header.texFormat.unk_48 = le32_to_cpu(mat_header.texFormat.unk_48);
 
 #if defined(RDMATERIAL_LRU_LOAD_UNLOAD)
     // We have to short-circuit here so that we get the right fullpath
@@ -199,10 +219,26 @@ int rdMaterial_LoadEntry_Common(char *mat_fpath, rdMaterial *material, int creat
         }
         memset(texinfo_alloc, 0, sizeof(rdTexinfo)); // Moved
         rdroid_pHS->fileRead(mat_file_, &texinfo_header, sizeof(rdTexinfoHeader));
+        
+        // Byte swap
+        texinfo_header.texture_type = le32_to_cpu(texinfo_header.texture_type);
+        texinfo_header.solidColor = le32_to_cpu(texinfo_header.solidColor);
+        texinfo_header.field_8 = le32_to_cpu(texinfo_header.field_8);
+        texinfo_header.field_C = le32_to_cpu(texinfo_header.field_C);
+        texinfo_header.field_10 = le32_to_cpu(texinfo_header.field_10);
+        texinfo_header.field_14 = le32_to_cpu(texinfo_header.field_14);
+
         texinfo_alloc->header = texinfo_header;
         if ( texinfo_header.texture_type & 8 )  // bitflag for texture, not color
         {
               rdroid_pHS->fileRead(mat_file_, &tex_ext, sizeof(rdTexinfoExtHeader));
+              
+              // Byte swap
+              tex_ext.unk_00 = le32_to_cpu(tex_ext.unk_00);
+              tex_ext.height = le32_to_cpu(tex_ext.height);
+              tex_ext.alpha_en = le32_to_cpu(tex_ext.alpha_en);
+              tex_ext.unk_0c = le32_to_cpu(tex_ext.unk_0c);
+
               texinfo_alloc->texext_unk00 = tex_ext.unk_00;
               *texture_idk = tex_ext.unk_0c;
         }
@@ -250,6 +286,15 @@ int rdMaterial_LoadEntry_Common(char *mat_fpath, rdMaterial *material, int creat
       {
         //printf("asdf %x %x\n", tex_numa, material->num_textures);
         rdroid_pHS->fileRead(mat_file_, &tex_header_1, sizeof(rdTextureHeader));
+
+        // Byte swap
+        tex_header_1.width = le32_to_cpu(tex_header_1.width);
+        tex_header_1.height = le32_to_cpu(tex_header_1.height);
+        tex_header_1.alpha_en = le32_to_cpu(tex_header_1.alpha_en);
+        tex_header_1.unk_0c = le32_to_cpu(tex_header_1.unk_0c);
+        tex_header_1.unk_10 = le32_to_cpu(tex_header_1.unk_10);
+        tex_header_1.num_mipmaps = le32_to_cpu(tex_header_1.num_mipmaps);
+
         texture = &material->textures[tex_numa];
         texture->alpha_en = tex_header_1.alpha_en;
         texture->unk_0c = tex_header_1.unk_0c;
@@ -398,6 +443,12 @@ LABEL_22:
         return 0;
       }
       rdroid_pHS->fileRead(mat_file_, colors, 0x300);
+      
+      // If it's 16-bit, we might need to swap each color entry, 
+      // but rdColor24 is usually 3 bytes, which doesn't swap easily with le32_to_cpu.
+      // However, if the format is 16-bit, it might be reading 2-byte colors.
+      // Looking at the code, it reads 0x300 bytes (768 bytes), which is 256 * 3.
+      // So these are RGB888. No swapping needed for byte arrays.
     }
 #endif
 
