@@ -2,15 +2,6 @@
 # build_n64.sh — Build the OpenJKDF2 N64 ROM using CMake + libdragon Docker container
 #
 # All output goes into build_n64/ (both the cmake build tree and the final .z64).
-#
-# Usage:
-#   ./build_n64.sh            # configure (if needed) + build  (Release)
-#   ./build_n64.sh D=1        # same but with debug symbols (-g -O0) for GDB
-#   ./build_n64.sh clean      # wipe build_n64/ entirely
-#   ./build_n64.sh rebuild    # clean + full configure + build
-#   ./build_n64.sh rebuild D=1
-#   ./build_n64.sh run        # build + launch in mupen64plus
-#   ./build_n64.sh configure  # cmake configure only (no build)
 
 set -euo pipefail
 
@@ -18,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build_n64"
 ROM_OUT="$BUILD_DIR/openjkdf2.z64"
 
-# ── Parse D=1 flag (any position in args) ─────────────────────────────────────
+# ── Parse D=1 flag ────────────────────────────────────────────────────────────
 DEBUG_BUILD=0
 ARGS=()
 for arg in "$@"; do
@@ -42,14 +33,11 @@ check_libdragon() {
         || err "'libdragon' not found. Install from https://github.com/DragonMinded/libdragon"
 }
 
-# Run a command inside the libdragon Docker container.
-# The container mounts the project root as the working directory.
 container() {
     libdragon exec sh -c "$*"
 }
 
 ensure_cmake() {
-    # Check whether cmake is available inside the container.
     if ! container "cmake --version" &>/dev/null; then
         warn "cmake not found in container — installing..."
         container "apt-get update -qq && apt-get install -y --no-install-recommends cmake" \
@@ -90,94 +78,73 @@ cmd_configure() {
     ok "Configure done"
 }
 
-cmd_audio() {
-    check_libdragon
-    libdragon start
-
-    local ASSET_DIR="$SCRIPT_DIR/tools/out"
-    local FS_DIR="$SCRIPT_DIR/filesystem"
-
-    # Convert WAV -> wav64 (VADPCM, 22050 Hz, mono) inside container
-    if [ -d "$ASSET_DIR/sound" ] || [ -d "$ASSET_DIR/voice" ]; then
-        info "Converting audio assets to wav64..."
-        container "python3 tools/convert_media.py tools/out" \
-            || warn "Audio conversion had errors (continuing)"
-        ok "Audio conversion done"
-
-        # Sync wav64 files into filesystem/ so mkdfs packs them
-        for subdir in sound voice; do
-            if [ -d "$ASSET_DIR/$subdir" ]; then
-                mkdir -p "$FS_DIR/$subdir"
-                # Raw WAV: engine opens these to parse + read PCM
-                # Compressed wav64: available for future streaming/music use
-                find "$ASSET_DIR/$subdir" -name "*.wav64" \
-                    -exec cp -u {} "$FS_DIR/$subdir/" \;
-            fi
-        done
-        ok "wav64 files synced to filesystem/"
-    else
-        warn "No audio assets found under tools/out — skipping audio conversion"
-        warn "Run: python3 tools/extract_gob.py <path-to-JK-GOBs> tools/out"
-    fi
-}
-
 cmd_sync_assets() {
     local ASSET_DIR="$SCRIPT_DIR/tools/out"
     local FS_DIR="$SCRIPT_DIR/filesystem"
 
-    info "Syncing level 1 assets to filesystem/..."
+    info "Clearing filesystem directory..."
+    rm -rf "$FS_DIR"
     mkdir -p "$FS_DIR"
 
-    # Core UI and global assets
-    if [ -d "$ASSET_DIR/ui" ]; then
-        cp -ru "$ASSET_DIR/ui" "$FS_DIR/"
-    fi
-    if [ -d "$ASSET_DIR/misc" ]; then
-        cp -ru "$ASSET_DIR/misc" "$FS_DIR/"
-    fi
-
-    # Surgical inclusion for Level 1 (jedi.jkl)
-    # We include the jkl, and the whole directories for 3do/mat/cog for now
-    # as dependencies are complex to track manually.
-    for subdir in jkl 3do mat cog; do
+    info "Syncing surgical Level 1 assets to root..."
+    
+    # 1. Sync core directories fully (needed for GUI and game logic)
+    for subdir in ui misc cog; do
         if [ -d "$ASSET_DIR/$subdir" ]; then
-            mkdir -p "$FS_DIR/$subdir"
-            if [ "$subdir" == "jkl" ]; then
-                # Only include Level 1 JKL
-                cp -u "$ASSET_DIR/jkl/jedi.jkl" "$FS_DIR/jkl/" 2>/dev/null || warn "jedi.jkl not found"
-            else
-                # For 3do/mat/cog, we sync everything in tools/out
-                # (User should only extract what's needed to tools/out)
-                cp -ru "$ASSET_DIR/$subdir" "$FS_DIR/"
-            fi
+            cp -ru "$ASSET_DIR/$subdir" "$FS_DIR/"
         fi
     done
-    ok "Level 1 assets synced"
+
+    # 2. Add CD bypass
+    touch "$FS_DIR/jk_.cd"
+
+    # 3. Setup Episode file for discovery
+    local EP_DIR="$FS_DIR/episode/jk1"
+    mkdir -p "$EP_DIR"
+    if [ -f "$SCRIPT_DIR/tools/out_level1/episode.jk" ]; then
+        cp "$SCRIPT_DIR/tools/out_level1/episode.jk" "$EP_DIR/"
+    elif [ -f "$ASSET_DIR/episode.jk" ]; then
+        cp "$ASSET_DIR/episode.jk" "$EP_DIR/"
+    fi
+
+    # 4. Level 1 Surgical Sync (3DO, MAT, JKL) to root
+    local JKL_PATH=""
+    if [ -f "$SCRIPT_DIR/tools/out_level1/jkl/01narshadda.jkl" ]; then
+        JKL_PATH="$SCRIPT_DIR/tools/out_level1/jkl/01narshadda.jkl"
+    elif [ -f "$ASSET_DIR/jkl/01narshadda.jkl" ]; then
+        JKL_PATH="$ASSET_DIR/jkl/01narshadda.jkl"
+    fi
+
+    if [ -n "$JKL_PATH" ]; then
+        mkdir -p "$FS_DIR/jkl"
+        cp "$JKL_PATH" "$FS_DIR/jkl/"
+        # Run surgical filter for 3do/mat, outputting to FS root
+        python3 tools/filter_level_assets.py "$JKL_PATH" "$ASSET_DIR" "$FS_DIR"
+    else
+        warn "01narshadda.jkl not found"
+    fi
+
+    ok "Assets synced to root (Filtered)"
 }
 
 cmd_build() {
     check_libdragon
     libdragon start
 
-    # Re-configure only if the build directory doesn't have a CMakeCache yet
     if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
         cmd_configure
     fi
 
-    # Convert and sync audio assets before the ROM link
-    cmd_audio
-
-    # Sync level 1 assets
+    # Sync assets before building DFS
     cmd_sync_assets
 
     info "Building..."
-    container "cmake --build build_n64 --parallel \$(nproc)"
+    container "cmake --build build_n64 --parallel 4"
 
     if [ -f "$ROM_OUT" ]; then
         SIZE=$(wc -c < "$ROM_OUT")
         ok "Built: build_n64/openjkdf2.z64  (${SIZE} bytes)"
     else
-        # Some libdragon versions put the .z64 one level up — copy if so
         if [ -f "$SCRIPT_DIR/openjkdf2.z64" ]; then
             cp "$SCRIPT_DIR/openjkdf2.z64" "$ROM_OUT"
             ok "ROM copied to build_n64/openjkdf2.z64"
@@ -201,23 +168,18 @@ cmd_rebuild() {
 
 cmd_run() {
     cmd_build
-    command -v mupen64plus &>/dev/null \
-        || err "'mupen64plus' not found"
-    info "Launching mupen64plus..."
-    mupen64plus --noosd "$ROM_OUT"
+    info "Launching..."
+    ares --noosd "$ROM_OUT"
 }
-
-# ── dispatch ──────────────────────────────────────────────────────────────────
 
 case "${1:-build}" in
     build)     cmd_build     ;;
     configure) cmd_configure ;;
-    audio)     cmd_audio     ;;
     clean)     cmd_clean     ;;
     rebuild)   cmd_rebuild   ;;
     run)       cmd_run       ;;
     *)
-        printf 'Usage: %s [build|configure|audio|clean|rebuild|run]\n' "$0"
+        printf 'Usage: %s [build|configure|clean|rebuild|run]\n' "$0"
         exit 1
         ;;
 esac

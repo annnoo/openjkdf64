@@ -70,9 +70,12 @@ int jkEpisode_LoadVerify()
         jkRes_LoadCD(0);
     jkRes_UnhookHS();
     jkEpisode_var2 = 0;
+    
+    stdPlatform_Printf("Episode Scan: checking subdirectories...\n");
     v0 = stdFileUtil_NewFind("episode", 2, "*");
     while ( stdFileUtil_FindNext(v0, &v30) )
     {
+        stdPlatform_Printf("Episode Scan: found entry '%s' (dir=%d)\n", v30.fpath, v30.is_subdirectory != 0);
         if ( v30.fpath[0] != '.' )
         {
             if ( v30.is_subdirectory )
@@ -103,9 +106,12 @@ LABEL_11:
         }
     }
     stdFileUtil_DisposeFind(v0);
+    
+    stdPlatform_Printf("Episode Scan: checking GOB files...\n");
     v5 = stdFileUtil_NewFind("episode", 3, JKRES_GOB_EXT);
     while ( stdFileUtil_FindNext(v5, &v30) )
     {
+        stdPlatform_Printf("Episode Scan: found GOB '%s'\n", v30.fpath);
         if ( v30.fpath[0] != '.' )
         {
             stdFnames_StripExtAndDot(v30.fpath);
@@ -174,13 +180,16 @@ LABEL_30:
     v28 = 0;
     if ( jkEpisode_var2 )
     {
+        stdPlatform_Printf("Episode Scan: loading %d found episodes...\n", jkEpisode_var2);
         v16 = jkEpisode_aEpisodes;
         do
         {
+            stdPlatform_Printf("Episode Scan: checking '%s' for episode.jk...\n", v16->name);
             jkRes_LoadGob(v16->name);
             v17 = pHS->fileOpen("episode.jk", "rt");
             if ( v17 )
             {
+                stdPlatform_Printf("Episode Scan: success loading 'episode.jk' for '%s'\n", v16->name);
                 v19 = 0;
                 pHS->fileGets(v17, v29, 64);
                 if ( !pHS->fileEof(v17) )

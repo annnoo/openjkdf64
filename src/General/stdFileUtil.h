@@ -24,6 +24,7 @@ typedef struct stdFileSearch
     int field_0;
     int isNotFirst;
     char path[128];
+    char extension[32];
     union
     {
         intptr_t field_88;

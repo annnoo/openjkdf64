@@ -334,12 +334,130 @@ int stdFileUtil_Deltree(const char* lpPathName)
 
 #if defined(TARGET_N64)
 
-int stdFileUtil_FindNext(stdFileSearch *a1, stdFileSearchResult *a2) { return 0; }
-void stdFileUtil_DisposeFind(stdFileSearch *search) { if (search) std_pHS->free(search); }
-void stdFileUtil_FindReset(stdFileSearch *search) {}
-int stdFileUtil_FindQuick(const char *path, int type, const char *extension, stdFileSearchResult *result) { return 0; }
-int stdFileUtil_CountMatches(const char *path, int type, const char *extension) { return 0; }
-int stdFileUtil_DirExists(const char *path) { return 0; }
+#include <libdragon.h>
+#include <ctype.h>
+#include <dir.h>
+
+typedef struct {
+    char dir_path[128];
+    dir_t entry;
+} n64_dir_state_t;
+
+int stdFileUtil_FindNext(stdFileSearch *a1, stdFileSearchResult *a2) {
+    int ret;
+
+    if (!a1->isNotFirst) {
+        char path[128];
+        int dst = 0;
+        
+        // Extract directory from path (e.g. "episode/*.*" -> "/episode")
+        const char* last_slash = _strrchr(a1->path, '/');
+        const char* last_backslash = _strrchr(a1->path, '\\');
+        const char* split = last_slash > last_backslash ? last_slash : last_backslash;
+        
+        path[0] = '/';
+        dst = 1;
+
+        if (split) {
+            int len = split - a1->path;
+            if (len > 0) {
+                for (int i = 0; i < len && dst < 126; i++) {
+                    path[dst++] = tolower((unsigned char)a1->path[i]);
+                }
+            }
+        }
+        path[dst] = 0;
+
+        // Store extension for filtering (after the last dot)
+        const char* ext = _strrchr(a1->path, '.');
+        if (ext && (!split || ext > split)) {
+            strncpy(a1->extension, ext + 1, sizeof(a1->extension)-1);
+            a1->extension[sizeof(a1->extension)-1] = 0;
+            for (int i = 0; a1->extension[i]; i++) a1->extension[i] = tolower((unsigned char)a1->extension[i]);
+        } else {
+            a1->extension[0] = 0;
+        }
+
+        stdPlatform_Printf("DFS FindFirst: dir='%s' pattern='%s' ext='%s'\n", path, a1->path, a1->extension);
+        
+        n64_dir_state_t* state = (n64_dir_state_t*)std_pHS->alloc(sizeof(n64_dir_state_t));
+        strncpy(state->dir_path, path, 127);
+        state->dir_path[127] = 0;
+
+        ret = dir_findfirst(state->dir_path, &state->entry);
+        a1->isNotFirst = 1;
+        a1->field_88 = (intptr_t)state;
+    } else {
+        n64_dir_state_t* state = (n64_dir_state_t*)a1->field_88;
+        ret = dir_findnext(state->dir_path, &state->entry);
+    }
+
+    n64_dir_state_t* state = (n64_dir_state_t*)a1->field_88;
+
+    while (ret == 0) {
+        // Filter by extension if requested
+        if (a1->extension[0] && strcmp(a1->extension, "*") != 0) {
+            const char* entry_ext = _strrchr(state->entry.d_name, '.');
+            if (!entry_ext || strcasecmp(entry_ext + 1, a1->extension) != 0) {
+                ret = dir_findnext(state->dir_path, &state->entry);
+                continue;
+            }
+        }
+        
+        // Skip . and ..
+        if (state->entry.d_name[0] == '.' && (state->entry.d_name[1] == 0 || (state->entry.d_name[1] == '.' && state->entry.d_name[2] == 0))) {
+            ret = dir_findnext(state->dir_path, &state->entry);
+            continue;
+        }
+
+        strncpy(a2->fpath, state->entry.d_name, sizeof(a2->fpath)-1);
+        a2->fpath[sizeof(a2->fpath)-1] = 0;
+
+        a2->is_subdirectory = (state->entry.d_type == 2) ? 0x10 : 0; // DT_DIR = 2
+        a2->time_write = 0;
+
+        stdPlatform_Printf("DFS Found: '%s' (dir=%d)\n", state->entry.d_name, a2->is_subdirectory != 0);
+        return 1;
+    }
+
+    return 0;
+}
+
+void stdFileUtil_DisposeFind(stdFileSearch *search) { 
+    if (search) {
+        if (search->isNotFirst && search->field_88) {
+            std_pHS->free((void*)search->field_88);
+        }
+        std_pHS->free(search); 
+    }
+}
+void stdFileUtil_FindReset(stdFileSearch *search) { 
+    if (search && search->isNotFirst && search->field_88) {
+        std_pHS->free((void*)search->field_88);
+        search->field_88 = 0;
+        search->isNotFirst = 0; 
+    }
+}
+int stdFileUtil_FindQuick(const char *path, int type, const char *extension, stdFileSearchResult *result) {
+    stdFileSearch *search = stdFileUtil_NewFind(path, type, extension);
+    if (!search) return 0;
+    int found = stdFileUtil_FindNext(search, result);
+    stdFileUtil_DisposeFind(search);
+    return found;
+}
+int stdFileUtil_CountMatches(const char *path, int type, const char *extension) {
+    stdFileSearchResult result;
+    stdFileSearch *search = stdFileUtil_NewFind(path, type, extension);
+    if (!search) return 0;
+    int count = 0;
+    while (stdFileUtil_FindNext(search, &result)) count++;
+    stdFileUtil_DisposeFind(search);
+    return count;
+}
+int stdFileUtil_DirExists(const char *path) { 
+    dir_t entry;
+    return dir_findfirst(path, &entry) == 0;
+}
 void stdFileUtil_RmDir(const char *path) {}
 int stdFileUtil_MkDir(char *path) { return 0; }
 int stdFileUtil_DelFile(char *lpFileName) { return 0; }
