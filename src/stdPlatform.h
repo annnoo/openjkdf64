@@ -63,7 +63,6 @@ const char* N64_GetPathForHandle(stdFile_t fhand);
 int stdConsolePrintf(const char *fmt, ...);
 
 #ifdef TARGET_N64
-#include <libdragon.h>
 #define le16_to_cpu(x) __builtin_bswap16(x)
 #define le32_to_cpu(x) __builtin_bswap32(x)
 #else
