@@ -176,20 +176,23 @@ LABEL_30:
         stdFileUtil_DisposeFind(v10);
     }
     jkRes_HookHS();
+    stdPlatform_Printf("Episode Scan: Finished scanning. Total candidates found: %d\n", jkEpisode_var2);
     result = jkEpisode_var2;
     v28 = 0;
     if ( jkEpisode_var2 )
     {
-        stdPlatform_Printf("Episode Scan: loading %d found episodes...\n", jkEpisode_var2);
+        stdPlatform_Printf("Episode Scan: Attempting to load 'episode.jk' for %d candidates...\n", jkEpisode_var2);
         v16 = jkEpisode_aEpisodes;
         do
         {
-            stdPlatform_Printf("Episode Scan: checking '%s' for episode.jk...\n", v16->name);
+            stdPlatform_Printf("Episode Scan: Loading candidate resource mount point '%s'...\n", v16->name);
             jkRes_LoadGob(v16->name);
+            
+            stdPlatform_Printf("Episode Scan: Opening 'episode.jk' via pHS->fileOpen...\n");
             v17 = pHS->fileOpen("episode.jk", "rt");
             if ( v17 )
             {
-                stdPlatform_Printf("Episode Scan: success loading 'episode.jk' for '%s'\n", v16->name);
+                stdPlatform_Printf("Episode Scan: SUCCESS! Parsing 'episode.jk' for '%s'\n", v16->name);
                 v19 = 0;
                 pHS->fileGets(v17, v29, 64);
                 if ( !pHS->fileEof(v17) )

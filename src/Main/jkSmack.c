@@ -45,6 +45,23 @@ int jkSmack_GetCurrentGuiState()
 
 int jkSmack_SmackPlay(const char *fname)
 {
+#if defined(TARGET_N64) || defined(TARGET_TWL)
+    if ( jkGuiRend_thing_five )
+        jkGuiRend_thing_four = 1;
+
+    jkSmack_stopTick = 1;
+    // If an episode is loaded, skip directly to gameplay. 
+    // Otherwise (on boot), skip to the title screen.
+    if (jkEpisode_mLoad.paEntries) {
+        jkSmack_nextGuiState = JK_GAMEMODE_GAMEPLAY;
+    } else {
+        jkSmack_nextGuiState = JK_GAMEMODE_TITLE;
+    }
+    
+    stdPlatform_Printf("jkSmack_SmackPlay: Skipping video '%s' (ep_active=%d) to gameplay/title on N64\n", fname, jkEpisode_mLoad.paEntries != NULL);
+    return 1;
+#endif
+
 #ifndef ARCH_WASM
     if ( stdComm_EarlyInit() || jkPlayer_setDisableCutscenes )
 #endif

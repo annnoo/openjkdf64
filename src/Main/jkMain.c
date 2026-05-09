@@ -557,7 +557,9 @@ void jkMain_GameplayShow(int a1, int a2)
 #ifdef JKM_DSS
             jkPlayer_SetAmmoMaximums(0);
 #endif
+            stdPlatform_Printf("jkMain_GameplayShow: Loading level '%s'...\n", jkMain_aLevelJklFname);
             v3 = sithMain_Mode1Init(jkMain_aLevelJklFname);
+            stdPlatform_Printf("jkMain_GameplayShow: sithMain_Mode1Init returned %d\n", v3);
         }
         else if ( jkSmack_gameMode == 1 )
         {
@@ -1330,6 +1332,9 @@ void jkMain_CdSwitchShow(int a1, int a2)
 void jkMain_VideoShow(int a1, int a2)
 {
     signed int result; // eax
+
+    // Reverted: forcing gameplay here crashes on boot. 
+    // Engines default skip-to-title is safer.
 
     // Added: Fix a bug with the door on Level 10?
     //if (Main_bMotsCompat && !sithNet_isMulti )

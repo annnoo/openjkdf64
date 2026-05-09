@@ -284,18 +284,13 @@ void jkGuiTitle_WorldLoadCallback(flex_t percentage)
             jkGuiTitle_elementsLoad[1].selectedTextEntry = (__int64)percentage;
             jkGuiRend_UpdateAndDrawClickable(&jkGuiTitle_elementsLoad[1], &jkGuiTitle_menuLoad, 1);
         }
-#if defined(SDL2_RENDER) || defined(TARGET_TWL)
-#if defined(PLATFORM_POSIX) && !defined(TARGET_TWL)
-    static uint64_t lastRefresh = 0;
-    // Only update loading bar at 30fps, so that we don't waste time
-    // during vsync.
-    if (Linux_TimeUs() - lastRefresh < 32*1000) {
-        return;
-    }
 
-    lastRefresh = Linux_TimeUs();
-#endif
-    stdDisplay_DDrawGdiSurfaceFlip();
+#ifdef TARGET_N64
+        // Force frame presentation so the loading bar updates
+        extern void n64_frame_end(void);
+        extern void n64_frame_begin(void);
+        n64_frame_end();
+        n64_frame_begin();
 #endif
     }
 }
@@ -335,12 +330,15 @@ void jkGuiTitle_ShowLoading(char *a1, wchar_t *a2)
     char key[64]; // [esp+Ch] [ebp-80h] BYREF
     char v8[64]; // [esp+4Ch] [ebp-40h] BYREF
 
+    stdPlatform_Printf("jkGuiTitle_ShowLoading: Initializing loading screen for '%s'...\n", a1);
+
 #ifdef QOL_IMPROVEMENTS
     jkGuiTitle_elementsLoad[4].bIsVisible = 0;
 #endif
 
     // Added
     stdBitmap_EnsureData(jkGui_stdBitmaps[JKGUI_BM_BK_MAIN]);
+    stdBitmap_EnsureData(jkGui_stdBitmaps[JKGUI_BM_BK_LOADING]);
 
     jkGui_SetModeMenu(jkGui_stdBitmaps[JKGUI_BM_BK_MAIN]->palette);
     jkGuiTitle_whichLoading = 2;
@@ -353,7 +351,19 @@ void jkGuiTitle_ShowLoading(char *a1, wchar_t *a2)
     jkGuiTitle_elementsLoad[0].wstr = a2;
     if ( !a2 )
         jkGuiTitle_elementsLoad[0].wstr = v4;
+
+    stdPlatform_Printf("jkGuiTitle_ShowLoading: Drawing first frame...\n");
     jkGuiRend_gui_sets_handler_framebufs(&jkGuiTitle_menuLoad);
+
+#ifdef TARGET_N64
+    // Force frame presentation so the loading screen is visible before sithMain_Mode1Init blocks
+    extern void n64_frame_end(void);
+    extern void n64_frame_begin(void);
+    n64_frame_end();
+    n64_frame_begin();
+#endif
+
+    stdPlatform_Printf("jkGuiTitle_ShowLoading: Done\n");
 }
 
 void jkGuiTitle_LoadingFinalize()

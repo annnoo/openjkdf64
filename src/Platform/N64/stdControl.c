@@ -53,7 +53,14 @@ void stdControl_SetKeydown(int k, int bDown, uint32_t t) { set_key(k, bDown); }
 void stdControl_SetSDLKeydown(int k, int bDown, uint32_t t) { set_key(k, bDown); }
 void stdControl_InitAxis(int idx, int mn, int mx, flex_t mul) {}
 void stdControl_ToggleCursor(int a)        {}
-int  stdControl_ShowCursor(int a)          { return 0; }
+
+static int n64_cursor_count = 0;
+int  stdControl_ShowCursor(int a) {
+    if (a) n64_cursor_count++;
+    else n64_cursor_count--;
+    return n64_cursor_count;
+}
+
 void stdControl_ToggleMouse()              {}
 void stdControl_ReadMouse()                {}
 void stdControl_ShowSystemKeyboard()       {}

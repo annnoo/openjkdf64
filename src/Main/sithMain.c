@@ -145,16 +145,25 @@ void sithMain_Free()
 
 int sithMain_Mode1Init(char *a1)
 {
+    stdPlatform_Printf("sithMain_Mode1Init: Initializing level '%s'...\n", a1);
     sithWorld_pCurrentWorld = sithWorld_New();
 
-    if ( !sithWorld_Load(sithWorld_pCurrentWorld, a1) )
+    stdPlatform_Printf("sithMain_Mode1Init: Loading world...\n");
+    if ( !sithWorld_Load(sithWorld_pCurrentWorld, a1) ) {
+        stdPlatform_Printf("sithMain_Mode1Init: FAILED loading world '%s'\n", a1);
         return 0;
+    }
 
+    stdPlatform_Printf("sithMain_Mode1Init: sithWorld_Initialize...\n");
     sithTime_Startup();
     sithWorld_Initialize();
+    
+    stdPlatform_Printf("sithMain_Mode1Init: sithMain_Open...\n");
     sithMain_Open();
+    
     sithTime_Startup();
     g_sithMode = 1;
+    stdPlatform_Printf("sithMain_Mode1Init: SUCCESS, transitioning to gameplay mode\n");
     return 1;
 }
 
@@ -185,19 +194,32 @@ int sithMain_Mode1Init_3(char *fpath)
 
 int sithMain_Open()
 {
+    stdPlatform_Printf("sithMain_Open: Starting subsystems...\n");
     jkPlayer_currentTickIdx = 0;
     sithRender_lastRenderTick = 1;
     sithWorld_sub_4D0A20(sithWorld_pCurrentWorld);
+    
+    stdPlatform_Printf("sithMain_Open: sithEvent_Open...\n");
     sithEvent_Open();
+    stdPlatform_Printf("sithMain_Open: sithSurface_Open...\n");
     sithSurface_Open();
+    stdPlatform_Printf("sithMain_Open: sithAI_Open...\n");
     sithAI_Open();
+    stdPlatform_Printf("sithMain_Open: sithSoundMixer_Open...\n");
     sithSoundMixer_Open();
+    stdPlatform_Printf("sithMain_Open: sithCog_Open...\n");
     sithCog_Open();
+    stdPlatform_Printf("sithMain_Open: sithControl_Open...\n");
     sithControl_Open();
+    stdPlatform_Printf("sithMain_Open: sithAIAwareness_Startup...\n");
     sithAIAwareness_Startup();
+    stdPlatform_Printf("sithMain_Open: sithRender_Open...\n");
     sithRender_Open();
+    stdPlatform_Printf("sithMain_Open: sithWeapon_StartupEntry...\n");
     sithWeapon_StartupEntry();
+    
     sithMain_bOpened = 1;
+    stdPlatform_Printf("sithMain_Open: SUCCESS\n");
     return 1;
 }
 
