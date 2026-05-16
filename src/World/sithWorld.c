@@ -232,6 +232,7 @@ parse_problem:
     stdPrintf(pSithHS->errorPrint, ".\\World\\sithWorld.c", 276, "Parse problem in file '%s'.\n", v8);
     goto cleanup;
 cleanup:
+    sithWorld_pLoading = 0; // Fix: prevent dangling pointer after failed load
     sithWorld_FreeEntry(pWorld);
     return 0;
 }

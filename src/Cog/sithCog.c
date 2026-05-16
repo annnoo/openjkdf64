@@ -39,6 +39,10 @@
 
 #include "jk.h"
 
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
+
 static int32_t sithCog_bInitted = 0;
 
 // MOTS altered
@@ -615,11 +619,21 @@ sithCog* sithCog_LoadCogscript(const char *fpath)
     uint32_t v9; // eax
     char cog_fpath[128]; // [esp+10h] [ebp-80h] BYREF
 
+    if (!sithWorld_pLoading) return 0; // Fix: guard against dangling pointer (e.g. static.jkl failed to load)
     cogIdx = sithWorld_pLoading->numCogsLoaded;
     if ( cogIdx >= sithWorld_pLoading->numCogs )
         return 0;
 
+#ifdef TARGET_N64
+    debugf("[N64_DEBUG] Loading Cog %d. sithWorld_pLoading=%p, cogs_array=%p\n", cogIdx, sithWorld_pLoading, sithWorld_pLoading->cogs);
+#endif
+
     cog = &sithWorld_pLoading->cogs[cogIdx];
+    
+#ifdef TARGET_N64
+    debugf("[N64_DEBUG] cog pointer: %p\n", cog);
+#endif
+
     cog->selfCog = cogIdx;
     if (sithWorld_pLoading->level_type_maybe & 1)
     {

@@ -130,7 +130,10 @@ int sithMain_Load(char *path)
 {
     sithWorld_pStatic = sithWorld_New();
     sithWorld_pStatic->level_type_maybe |= 1;
-    return sithWorld_Load(sithWorld_pStatic, path) != 0;
+    int result = sithWorld_Load(sithWorld_pStatic, path) != 0;
+    if (!result)
+        sithWorld_pStatic = 0; // sithWorld_FreeEntry already freed it inside sithWorld_Load cleanup
+    return result;
 }
 
 void sithMain_Free()
