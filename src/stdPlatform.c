@@ -12,6 +12,7 @@
 
 #ifdef TARGET_N64
 #include <libdragon.h>
+extern void N64_PumpIdle(void);
 #endif
 
 #ifdef PLATFORM_POSIX
@@ -131,14 +132,22 @@ static int N64_stdFileClose(stdFile_t fhand)
 static size_t N64_stdFileRead(stdFile_t fhand, void* dst, size_t len)
 {
     uint32_t handle = (uint32_t)(uintptr_t)fhand;
-    uint32_t rom_addr = dfs_rom_addr(handle) + dfs_tell(handle);
+    uint32_t remaining = dfs_size(handle) - dfs_tell(handle);
+    if (len > remaining) len = remaining;
+    if (len == 0) return 0;
 
-    dma_read_async(dst, rom_addr, len);
-    while (dma_busy()) {
-        extern void N64_PumpIdle(void);
-        N64_PumpIdle();
+    // dma_read_async requires 8-byte alignment and works best for larger reads
+    if (((uintptr_t)dst & 7) == 0 && len >= 64) {
+        uint32_t rom_addr = dfs_rom_addr(handle) + dfs_tell(handle);
+        dma_read_async(dst, rom_addr, len);
+        while (dma_busy()) {
+            N64_PumpIdle();
+        }
+        data_cache_hit_invalidate(dst, len);
+        dfs_seek(handle, len, SEEK_CUR);
+    } else {
+        dfs_read(dst, 1, len, handle);
     }
-    dfs_seek(handle, len, SEEK_CUR);
 
     if (len <= 40) debugf("[N64_fileRead] handle=%u len=%u first4=%02x%02x%02x%02x\n",
         handle, (uint32_t)len,
