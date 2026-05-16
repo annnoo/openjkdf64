@@ -56,6 +56,11 @@ void Window_SetFullscreen(int val){ Window_isFullscreen = val; }
 void Window_RecreateSDL2Window()  {}
 void Window_SdlVblank()           {}
 
+void N64_PumpIdle(void) {
+    mixer_try_play();
+    joypad_poll();
+}
+
 int Window_ShowCursorUnwindowed(int a1) { return stdControl_ShowCursor(a1); }
 
 int Window_DefaultHandler(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam, void* unused) { return 0; }

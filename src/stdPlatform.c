@@ -130,11 +130,20 @@ static int N64_stdFileClose(stdFile_t fhand)
 
 static size_t N64_stdFileRead(stdFile_t fhand, void* dst, size_t len)
 {
-    int ret = dfs_read(dst, 1, len, (uint32_t)(uintptr_t)fhand);
-    if (len <= 40) debugf("[N64_fileRead] handle=%u len=%u ret=%d first4=%02x%02x%02x%02x\n",
-        (uint32_t)(uintptr_t)fhand, (uint32_t)len, ret,
+    uint32_t handle = (uint32_t)(uintptr_t)fhand;
+    uint32_t rom_addr = dfs_rom_addr(handle) + dfs_tell(handle);
+
+    dma_read_async(dst, rom_addr, len);
+    while (dma_busy()) {
+        extern void N64_PumpIdle(void);
+        N64_PumpIdle();
+    }
+    dfs_seek(handle, len, SEEK_CUR);
+
+    if (len <= 40) debugf("[N64_fileRead] handle=%u len=%u first4=%02x%02x%02x%02x\n",
+        handle, (uint32_t)len,
         ((uint8_t*)dst)[0], ((uint8_t*)dst)[1], ((uint8_t*)dst)[2], ((uint8_t*)dst)[3]);
-    return (ret < 0) ? 0 : (size_t)ret;
+    return len;
 }
 
 static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
