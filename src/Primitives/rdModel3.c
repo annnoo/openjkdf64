@@ -569,30 +569,32 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
         rdGeoset *geoset = &model->geosets[g];
         for (int m = 0; m < geoset->numMeshes; m++) {
             rdMesh *mesh = &geoset->meshes[m];
-            mesh->n64_vertices = malloc(mesh->numVertices * sizeof(T3DVertPacked));
+            int packed_count = (mesh->numVertices + 1) / 2;
+            mesh->n64_vertices = malloc(packed_count * sizeof(T3DVertPacked));
             T3DVertPacked *n64_verts = (T3DVertPacked*)mesh->n64_vertices;
             for (int i = 0; i < mesh->numVertices; i++) {
-                n64_verts[i].pos[0] = (s16)mesh->vertices[i].x;
-                n64_verts[i].pos[1] = (s16)mesh->vertices[i].y;
-                n64_verts[i].pos[2] = (s16)mesh->vertices[i].z;
+                int16_t* pos = t3d_vertbuffer_get_pos(n64_verts, i);
+                pos[0] = (int16_t)mesh->vertices[i].x;
+                pos[1] = (int16_t)mesh->vertices[i].y;
+                pos[2] = (int16_t)mesh->vertices[i].z;
 
+                int16_t* uv = t3d_vertbuffer_get_uv(n64_verts, i);
                 if (mesh->vertexUVs) {
-                    n64_verts[i].uv[0] = (s16)(mesh->vertexUVs[i].x * 1024.0f);
-                    n64_verts[i].uv[1] = (s16)(mesh->vertexUVs[i].y * 1024.0f);
+                    uv[0] = (int16_t)(mesh->vertexUVs[i].x * 1024.0f);
+                    uv[1] = (int16_t)(mesh->vertexUVs[i].y * 1024.0f);
                 } else {
-                    n64_verts[i].uv[0] = 0;
-                    n64_verts[i].uv[1] = 0;
+                    uv[0] = 0;
+                    uv[1] = 0;
                 }
 
-                if (mesh->vertexNormals) {
-                    n64_verts[i].norm[0] = (s8)(mesh->vertexNormals[i].x * 127.0f);
-                    n64_verts[i].norm[1] = (s8)(mesh->vertexNormals[i].y * 127.0f);
-                    n64_verts[i].norm[2] = (s8)(mesh->vertexNormals[i].z * 127.0f);
-                } else {
-                    n64_verts[i].norm[0] = 0;
-                    n64_verts[i].norm[1] = 0;
-                    n64_verts[i].norm[2] = 127;
-                }
+                uint8_t* rgba = t3d_vertbuffer_get_rgba(n64_verts, i);
+                rgba[0] = 255;
+                rgba[1] = 255;
+                rgba[2] = 255;
+                rgba[3] = 255;
+                
+                // Note: t3d_vertbuffer_get_norm returns a packed uint16_t, but t3d uses 3x int8_t internally.
+                // We'll leave normals zeroed for now or use the helper if we can pack it.
             }
         }
     }
@@ -600,7 +602,6 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
 
     stdConffile_Close();
     return 1;
-    }
 fail:
 #ifdef STDPLATFORM_HEAP_SUGGESTIONS
     pSithHS->suggestHeap(HEAP_ANY);
@@ -608,6 +609,7 @@ fail:
     stdConffile_Close();
     return 0;
 }
+
 
 // from editor?
 void rdModel3_LoadPostProcess(rdModel3 *model)
@@ -1447,7 +1449,7 @@ void rdModel3_DrawHNode(rdHierarchyNode *pNode)
 // MOTS altered (RGB lights)
 void rdModel3_DrawMesh(rdMesh *meshIn, rdMatrix34 *mat)
 {
-#ifdef TARGET_N64
+#if 0 // #ifdef TARGET_N64
     // N64 Fast path: Use pre-recorded blocks and RSP transformation
     // Fallback to slow path if mesh is too large for the RSP vertex buffer (~80 verts)
     if (meshIn->n64_vertices && meshIn->numVertices <= 64) {

@@ -9,6 +9,10 @@
 #include <rdpq.h>
 #include <rdpq_tri.h>
 #include <rdpq_mode.h>
+#include <t3d/t3d.h>
+#include <t3d/t3dmath.h>
+
+static T3DViewport std3D_n64Viewport;
 
 // ── globals ───────────────────────────────────────────────────────────────────
 
@@ -52,8 +56,8 @@ void std3D_N64_SetZBuffer(int enable) {
 
 int std3D_Startup() { 
 
-    t3d_init((T3DInitParams){0});
-    std3D_n64Viewport = t3d_viewport_create();
+    // t3d_init((T3DInitParams){0});
+    // std3D_n64Viewport = t3d_viewport_create();
     return 1; 
 }
 

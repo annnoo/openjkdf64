@@ -1892,6 +1892,7 @@ void sithRender_RenderLevelGeometry() {
     {
         extern void std3D_N64_SetZBuffer(int enable);
         std3D_N64_SetZBuffer(pass);
+        int pass_sectors_drawn = 0;
 #endif
 
     for (v72 = 0; v72 < sithRender_numSectors; v72++)
@@ -1901,10 +1902,13 @@ void sithRender_RenderLevelGeometry() {
 
 #ifdef TARGET_N64
         extern flex_t rdVector_Dist3(const rdVector3 *v1, const rdVector3 *v2);
-        extern rdCamera *sithCamera_currentCamera;
-        flex_t dist = rdVector_Dist3(&sithCamera_currentCamera->vec3_1, &level_idk->center);
+        flex_t dist = 0.0;
+        if (sithCamera_currentCamera) {
+            dist = rdVector_Dist3(&sithCamera_currentCamera->vec3_1, &level_idk->center);
+        }
         if (pass == 0 && dist <= 20.0) continue; // Distant pass: skip near
         if (pass == 1 && dist > 20.0) continue;  // Near pass: skip far
+        pass_sectors_drawn++;
 #endif
 #ifdef TARGET_TWL
         level_idk->clipVisited = 0;
@@ -2623,6 +2627,11 @@ void sithRender_RenderLevelGeometry() {
 //#endif
 
 #ifdef TARGET_N64
+        static int debug_pass_logs = 0;
+        if (debug_pass_logs < 10 && pass_sectors_drawn > 0) {
+            debugf("[N64] RenderLevelGeometry: pass %d drew %d sectors\n", pass, pass_sectors_drawn);
+            debug_pass_logs++;
+        }
     }
 #endif
     rdCamera_pCurCamera->pClipFrustum = pFullCameraFrustum;

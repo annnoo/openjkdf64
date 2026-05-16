@@ -18,6 +18,7 @@ extern void N64_PumpIdle(void);
 #ifdef PLATFORM_POSIX
 #include <stdlib.h>
 #include <stdio.h>
+#include <malloc.h>
 #include <time.h>
 #include <math.h>
 #include <string.h>
@@ -55,6 +56,7 @@ static void N64_MapHandleToPath(FILE* f, const char* path) {
             return;
         }
     }
+    debugf("[N64_WARNING] Exceeded 128 open file handles! Path mapping lost for %s\n", path);
 }
 
 static const char* N64_GetPathForHandleInternal(FILE* f) {
@@ -92,14 +94,13 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
     }
 
     // Ensure leading slash
-    strcpy(tmp, "rom:");
+    strcpy(tmp, "rom:/");
+    strcpy(tmp_case, "rom:/");
     dst = 5;
 
     // Skip leading slash to avoid "rom://"
-    if (fpath[src] != '/') {
-        tmp[dst] = '/';
-        tmp_case[dst] = '/';
-        dst++;
+    if (fpath[src] == '/') {
+        src++;
     }
   
 
@@ -141,7 +142,6 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
     }
 
     if (n64_fileopen_log_count < 50) {
-        debugf("[N64_fileOpen] dfs_open(\"%s\") OK handle=%d size=%lu\n", tmp, handle, (unsigned long)dfs_size(handle));
         n64_fileopen_log_count++;
     }
 

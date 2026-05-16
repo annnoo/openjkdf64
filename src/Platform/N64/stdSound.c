@@ -57,7 +57,7 @@ typedef struct {
 // ── Global state ──────────────────────────────────────────────────────────────
 flex_t stdSound_fMenuVolume = 1.0f;
 
-static bool g_audio_inited = false;
+bool g_audio_inited = false;
 
 #define SFX_CH_FIRST 4
 #define SFX_CH_LAST  31
