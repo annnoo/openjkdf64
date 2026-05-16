@@ -1717,6 +1717,12 @@ void sithRender_RenderLevelGeometry()
 #ifdef EXPERIMENTAL_FIXED_POINT
     int skip_this_surface = 1;
 #endif
+#ifdef TARGET_N64
+    rdMatrix34 originalViewMatrix;
+    rdVector3 scaleVec = {0.01f, 0.01f, 0.01f};
+    int pass;
+    uint32_t savedTick;
+#endif
 #ifdef TARGET_TWL
     rdroid_curAcceleration = 1;
     sithRender_flag &= ~0x8; // Drops render time by 2/3 by rendering by n-gons instead of tris
@@ -1752,10 +1758,25 @@ void sithRender_RenderLevelGeometry()
     sithRender_idxInfo.vertexUVs = vertices_uvs;
     pFullCameraFrustum = rdCamera_pCurCamera->pClipFrustum;
 
+#ifdef TARGET_N64
+    for (int pass = 0; pass < 2; pass++)
+    {
+        extern void std3D_N64_SetZBuffer(int enable);
+        std3D_N64_SetZBuffer(pass);
+#endif
+
     for (v72 = 0; v72 < sithRender_numSectors; v72++)
     {
         // Surfaces are 13ms on landing terminal spawn
         level_idk = sithRender_aSectors[v72];
+
+#ifdef TARGET_N64
+        extern flex_t rdVector_Dist3(const rdVector3 *v1, const rdVector3 *v2);
+        extern rdCamera *sithCamera_currentCamera;
+        flex_t dist = rdVector_Dist3(&sithCamera_currentCamera->vec3_1, &level_idk->center);
+        if (pass == 0 && dist <= 20.0) continue; // Distant pass: skip near
+        if (pass == 1 && dist > 20.0) continue;  // Near pass: skip far
+#endif
 #ifdef TARGET_TWL
         level_idk->clipVisited = 0;
         if (level_idk->geoRenderTick == sithRender_lastRenderTick) {
@@ -2500,6 +2521,10 @@ LABEL_150:
     // TWL: 5-27ms
     rdCache_Flush();
 //#endif
+
+#ifdef TARGET_N64
+    }
+#endif
     rdCamera_pCurCamera->pClipFrustum = pFullCameraFrustum;
 }
 

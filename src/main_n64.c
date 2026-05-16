@@ -23,8 +23,9 @@ int main(void)
 
     // Must init DFS before any file I/O (jkStrings_Startup etc. will crash otherwise)
     dfs_init(DFS_DEFAULT_LOCATION);
+    asset_init();
 
-    debugf("[N64] dfs_init done\n");
+    debugf("[N64] dfs_init and asset_init done\n");
 
     // Quick sanity test: draw a red frame then continue
     {

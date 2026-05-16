@@ -2618,18 +2618,21 @@ typedef struct sithCollisionSearchResult
 
 typedef struct sithSector
 {
+    uint32_t flags;
+    sithSurface* surfaces;
+    uint32_t numSurfaces;
+    sithAdjoin* adjoins;
+    sithThing* thingsList;
     uint32_t id;
+    flex_t radius;
+    uint32_t renderTick;
+
     flex_t ambientLight;
     flex_t extraLight;
     rdColormap* colormap;
     rdVector3 tint;
     uint32_t numVertices;
     int32_t* verticeIdxs;
-    uint32_t numSurfaces;
-    sithSurface* surfaces;
-    sithAdjoin* adjoins;
-    sithThing* thingsList;
-    uint32_t flags;
     rdVector3 center;
     rdVector3 thrust;
     sithSound* sectorSound;
@@ -2638,8 +2641,6 @@ typedef struct sithSector
     rdVector3 collidebox_othercorner;
     rdVector3 boundingbox_onecorner;
     rdVector3 boundingbox_othercorner;
-    flex_t radius;
-    uint32_t renderTick;
     uint32_t clipVisited;
     rdClipFrustum* clipFrustum;
 #ifdef TARGET_TWL
@@ -2966,14 +2967,24 @@ typedef struct sithThingTrackParams
 typedef struct sithThing
 {
     uint32_t thingflags;
+    uint32_t type;
+    sithSector* sector;
+    sithThing* nextThing;
+    sithThing* prevThing;
+    rdVector3 position;
+
+    rdMatrix34 lookOrientation;
+
     uint32_t thingIdx;
     uint32_t thing_id;
+    uint32_t signature;
+    uint32_t moveType;
+    uint32_t controlType;
+
 #ifdef JKM_PARAMS
     uint32_t unk;
 #endif // JKM_TYPES
-    uint32_t type;
-    uint32_t moveType;
-    uint32_t controlType;
+
     int32_t lifeLeftMs;
     uint32_t timer;
     uint32_t pulse_end_ms;
@@ -3002,19 +3013,13 @@ typedef struct sithThing
 #endif
 
 
-    sithSector* sector;
-    sithThing* nextThing;
-    sithThing* prevThing;
     sithThing* attachedParentMaybe;
     sithThing* childThing;
     sithThing* parentThing;
-    uint32_t signature;
     sithThing* templateBase;
     sithThing* pTemplate;
     sithThing* prev_thing;
     uint32_t child_signature;
-    rdMatrix34 lookOrientation;
-    rdVector3 position;
     rdThing rdthing;
     rdVector3 screenPos;
     flex_t light;

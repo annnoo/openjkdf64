@@ -148,6 +148,10 @@ typedef struct rdMesh
     flex_t field_64;
     int field_68;
     int field_6C;
+#ifdef TARGET_N64
+    void* n64_vertices;
+    void* n64_block;
+#endif
 } rdMesh;
 #else
 
@@ -179,7 +183,10 @@ typedef struct rdMesh
     flex_t field_64;
     int field_68;
     int field_6C;
-    
+#ifdef TARGET_N64
+    void* n64_vertices;
+    void* n64_block;
+#endif
 } rdMesh;
 #endif
 

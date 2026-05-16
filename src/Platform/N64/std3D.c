@@ -17,7 +17,16 @@ int std3D_bReinitHudElements = 0;
 rdDDrawSurface* std3D_aLoadedSurfaces[STD3D_MAX_TEXTURES] = {0};
 size_t std3D_loadedTexturesAmt = 0;
 
+void std3D_N64_SetZBuffer(int enable) {
+    if (enable) {
+        rdpq_mode_zbuf(true, true);
+    } else {
+        rdpq_mode_zbuf(false, false);
+    }
+}
+
 int std3D_Startup() { 
+
     t3d_init((T3DInitParams){0});
     std3D_n64Viewport = t3d_viewport_create();
     return 1; 
@@ -154,3 +163,7 @@ int std3D_IsReady() { return 1; }
 int std3D_HasAlpha() { return 0; }
 int std3D_HasModulateAlpha() { return 0; }
 int std3D_HasAlphaFlatStippled() { return 0; }
+
+void std3D_N64_SetZBuffer(int enable) {
+    rdpq_mode_zbuf(enable ? true : false, enable ? true : false);
+}

@@ -28,38 +28,34 @@ extern void N64_PumpIdle(void);
 #include "SDL2_helper.h"
 
 #ifdef TARGET_N64
-#define MAX_DFS_HANDLES 128
-typedef struct {
-    uint32_t handle;
-    char path[128];
-} DfsPathMap;
-static DfsPathMap g_dfs_paths[MAX_DFS_HANDLES];
+static FILE* g_n64_files[128];
+static char g_n64_paths[128][128];
 
-static void N64_MapHandleToPath(uint32_t handle, const char* path) {
-    for (int i = 0; i < MAX_DFS_HANDLES; i++) {
-        if (g_dfs_paths[i].handle == 0) {
-            g_dfs_paths[i].handle = handle;
-            strncpy(g_dfs_paths[i].path, path, 127);
-            g_dfs_paths[i].path[127] = 0;
+static void N64_MapHandleToPath(FILE* f, const char* path) {
+    for (int i = 0; i < 128; i++) {
+        if (g_n64_files[i] == NULL) {
+            g_n64_files[i] = f;
+            strncpy(g_n64_paths[i], path, 127);
+            g_n64_paths[i][127] = 0;
             return;
         }
     }
 }
 
-static const char* N64_GetPathForHandleInternal(uint32_t handle) {
-    for (int i = 0; i < MAX_DFS_HANDLES; i++) {
-        if (g_dfs_paths[i].handle == handle) {
-            return g_dfs_paths[i].path;
+static const char* N64_GetPathForHandleInternal(FILE* f) {
+    for (int i = 0; i < 128; i++) {
+        if (g_n64_files[i] == f) {
+            return g_n64_paths[i];
         }
     }
     return NULL;
 }
 
-static void N64_UnmapHandle(uint32_t handle) {
-    for (int i = 0; i < MAX_DFS_HANDLES; i++) {
-        if (g_dfs_paths[i].handle == handle) {
-            g_dfs_paths[i].handle = 0;
-            g_dfs_paths[i].path[0] = 0;
+static void N64_UnmapHandle(FILE* f) {
+    for (int i = 0; i < 128; i++) {
+        if (g_n64_files[i] == f) {
+            g_n64_files[i] = NULL;
+            g_n64_paths[i][0] = 0;
             return;
         }
     }
@@ -70,8 +66,7 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
     // DFS is read-only
     if (mode[0] != 'r') return 0;
 
-    // dfs_open needs an absolute path: /ui/sft/small0.sft
-    // Convert backslashes, lowercase, and ensure leading slash.
+    // Convert backslashes, lowercase, and ensure rom:/ prefix
     char tmp[256];
     int src = 0, dst = 0;
 
@@ -80,8 +75,11 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
         src = 5;
     }
 
-    // Ensure leading slash
-    if (fpath[src] != '/') tmp[dst++] = '/';
+    strcpy(tmp, "rom:/");
+    dst = 5;
+
+    // Skip leading slash to avoid "rom://"
+    if (fpath[src] == '/') src++;
 
     for (; fpath[src] && dst < 254; src++, dst++) {
         char c = fpath[src];
@@ -91,15 +89,15 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
     }
     tmp[dst] = 0;
 
-    int handle = dfs_open(tmp);
-    if (handle < 0) {
+    FILE* f = fopen(tmp, mode);
+    if (!f) {
         // If it was a .wav request, try .wav64
         size_t len = strlen(tmp);
         if (len > 4 && strcmp(&tmp[len-4], ".wav") == 0) {
             strcpy(&tmp[len-4], ".wav64");
-            handle = dfs_open(tmp);
-            if (handle >= 0) {
-                debugf("[N64_fileOpen] redirected .wav -> .wav64: \"%s\" OK handle=%d\n", tmp, handle);
+            f = fopen(tmp, mode);
+            if (f) {
+                debugf("[N64_fileOpen] redirected .wav -> .wav64: \"%s\" OK\n", tmp);
             } else {
                 // Restore .wav for error message if .wav64 also failed
                 strcpy(&tmp[len-4], ".wav");
@@ -107,52 +105,53 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
         }
     }
 
-    if (handle < 0) {
-        debugf("[N64_fileOpen] dfs_open(\"%s\") FAILED: %s\n", tmp, dfs_strerror(handle));
+    if (!f) {
+        debugf("[N64_fileOpen] fopen(\"%s\") FAILED\n", tmp);
         return 0;
     }
 
-    N64_MapHandleToPath((uint32_t)handle, tmp);
+    N64_MapHandleToPath(f, tmp);
 
-    debugf("[N64_fileOpen] dfs_open(\"%s\") OK handle=%d\n", tmp, handle);
-    return (stdFile_t)(uintptr_t)handle;
+    debugf("[N64_fileOpen] fopen(\"%s\") OK\n", tmp);
+    return (stdFile_t)f;
 }
 
 const char* N64_GetPathForHandle(stdFile_t fhand)
 {
-    return N64_GetPathForHandleInternal((uint32_t)(uintptr_t)fhand);
+    return N64_GetPathForHandleInternal((FILE*)fhand);
 }
 
 static int N64_stdFileClose(stdFile_t fhand)
 {
-    N64_UnmapHandle((uint32_t)(uintptr_t)fhand);
-    return dfs_close((uint32_t)(uintptr_t)fhand);
+    N64_UnmapHandle((FILE*)fhand);
+    return fclose((FILE*)fhand);
 }
 
 static size_t N64_stdFileRead(stdFile_t fhand, void* dst, size_t len)
 {
-    uint32_t handle = (uint32_t)(uintptr_t)fhand;
-    uint32_t remaining = dfs_size(handle) - dfs_tell(handle);
-    if (len > remaining) len = remaining;
-    if (len == 0) return 0;
+    FILE* f = (FILE*)fhand;
+    size_t total_read = 0;
+    const size_t CHUNK_SIZE = 16 * 1024;
 
-    // dma_read_async requires 8-byte alignment and works best for larger reads
-    if (((uintptr_t)dst & 7) == 0 && len >= 64) {
-        uint32_t rom_addr = dfs_rom_addr(handle) + dfs_tell(handle);
-        dma_read_async(dst, rom_addr, len);
-        while (dma_busy()) {
-            N64_PumpIdle();
+    while (total_read < len)
+    {
+        size_t to_read = len - total_read;
+        if (to_read > CHUNK_SIZE) to_read = CHUNK_SIZE;
+
+        size_t ret = fread((char*)dst + total_read, 1, to_read, f);
+        if (ret > 0)
+        {
+            total_read += ret;
         }
-        data_cache_hit_invalidate(dst, len);
-        dfs_seek(handle, len, SEEK_CUR);
-    } else {
-        dfs_read(dst, 1, len, handle);
+
+        N64_PumpIdle();
+
+        if (ret < to_read) break; // EOF or error
     }
 
-    if (len <= 40) debugf("[N64_fileRead] handle=%u len=%u first4=%02x%02x%02x%02x\n",
-        handle, (uint32_t)len,
-        ((uint8_t*)dst)[0], ((uint8_t*)dst)[1], ((uint8_t*)dst)[2], ((uint8_t*)dst)[3]);
-    return len;
+    if (total_read <= 40) debugf("[N64_fileRead] f=%p len=%u ret=%u\n",
+        f, (uint32_t)len, (uint32_t)total_read);
+    return total_read;
 }
 
 static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
@@ -162,30 +161,22 @@ static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
 
 static const char* N64_stdFileGets(stdFile_t fhand, char* dst, size_t len)
 {
-    size_t i = 0;
-    char c;
-    while (i < len - 1) {
-        if (dfs_read(&c, 1, 1, (uint32_t)(uintptr_t)fhand) <= 0) break;
-        dst[i++] = c;
-        if (c == '\n') break;
-    }
-    dst[i] = 0;
-    return (i == 0) ? NULL : dst;
+    return fgets(dst, len, (FILE*)fhand);
 }
 
 static int N64_stdFseek(stdFile_t fhand, int a, int b)
 {
-    return dfs_seek((uint32_t)(uintptr_t)fhand, a, b);
+    return fseek((FILE*)fhand, a, b);
 }
 
 static int N64_stdFtell(stdFile_t fhand)
 {
-    return dfs_tell((uint32_t)(uintptr_t)fhand);
+    return ftell((FILE*)fhand);
 }
 
 static int N64_stdFeof(stdFile_t fhand)
 {
-    return dfs_eof((uint32_t)(uintptr_t)fhand);
+    return feof((FILE*)fhand);
 }
 
 uint32_t N64_TimeMs()
@@ -391,7 +382,11 @@ static int Linux_stdFtell(stdFile_t fhand)
 
 static void* Linux_alloc(uint32_t len)
 {
+#ifdef TARGET_N64
+    void* ret = memalign(8, len);
+#else
     void* ret = malloc(len);
+#endif
     if (ret) {
         memset(ret, 0, len);
     }
@@ -929,7 +924,6 @@ void stdPlatform_InitServices(HostServices *handlers)
 #endif
 
 #ifdef TARGET_N64
-    dfs_init(DFS_DEFAULT_LOCATION);
     handlers->fileOpen = N64_stdFileOpen;
     handlers->fileClose = N64_stdFileClose;
     handlers->fileRead = N64_stdFileRead;

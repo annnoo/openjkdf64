@@ -131,6 +131,9 @@ void std3D_DrawUIClearedRect(uint8_t palIdx, rdRect* dstRect);
 void std3D_DrawUIClearedRectRGBA(uint8_t color_r, uint8_t color_g, uint8_t color_b, uint8_t color_a, rdRect* dstRect);
 int std3D_IsReady();
 
+// Added: N64 Z-Buffer toggle
+void std3D_N64_SetZBuffer(int enable);
+
 #ifdef __cplusplus
 }
 #endif
