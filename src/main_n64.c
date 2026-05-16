@@ -30,11 +30,11 @@ int main(void)
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_DISABLED);
 
     debugf("[N64] display_init done\n");
-// Must init DFS before any file I/O (jkStrings_Startup etc. will crash otherwise)
-dfs_init(DFS_DEFAULT_LOCATION);
 
-debugf("[N64] dfs_init done\n");
+    // Must init DFS before any file I/O (jkStrings_Startup etc. will crash otherwise)
+    dfs_init(DFS_DEFAULT_LOCATION);
 
+    debugf("[N64] dfs_init done\n");
 
     // Quick sanity test: draw a red frame then continue
     {

@@ -1848,13 +1848,8 @@ void sithRender_RenderLevelGeometry() {
 #ifdef EXPERIMENTAL_FIXED_POINT
   int skip_this_surface = 1;
 #endif
-#ifdef TARGET_N64
-    rdMatrix34 originalViewMatrix;
-    rdVector3 scaleVec = {0.01f, 0.01f, 0.01f};
-    int pass;
-    uint32_t savedTick;
-#endif
-#ifdef TARGET_TWL
+
+#if defined(TARGET_TWL) || defined(TARGET_N64)
     rdroid_curAcceleration = 1;
     sithRender_flag &= ~0x8; // Drops render time by 2/3 by rendering by n-gons instead of tris
 #endif

@@ -101,7 +101,7 @@ int stdControl_ReadKey(int keyNum, int *pOut) {
 //   C-up/down/left→ KEY_JOY1_B4/5/6
 
 void stdControl_ReadControls(void) {
-    // joypad_poll(); // REMOVED: Now handled by N64_PumpIdle
+    joypad_poll();
     joypad_inputs_t  inp = joypad_get_inputs(JOYPAD_PORT_1);
     joypad_buttons_t held = joypad_get_buttons(JOYPAD_PORT_1);
 
