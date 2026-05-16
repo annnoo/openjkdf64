@@ -1,3 +1,6 @@
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
 #include "sithCamera.h"
 
 #include "World/sithSector.h"
@@ -217,6 +220,27 @@ void sithCamera_FollowFocus(sithCamera *cam)
     sithThing* focusThing = cam->primaryFocus;
     flex_t v77 = sithCamera_povShakeF2 * sithTime_deltaSeconds;
     flex_t v78 = sithCamera_povShakeF1 * sithTime_deltaSeconds;
+#ifdef TARGET_N64
+    {
+        static uint32_t _cam_last = 0;
+        static int _cam_dumped = 0;
+        uint32_t _now = stdPlatform_GetTimeMsec();
+        if (!_cam_dumped) {
+            _cam_dumped = 1;
+            debugf("[N64] cameras array: &[0]=%p persp=%d  &[1]=%p persp=%d  &[2]=%p persp=%d  &[3]=%p persp=%d\n",
+                   &sithCamera_cameras[0], sithCamera_cameras[0].cameraPerspective,
+                   &sithCamera_cameras[1], sithCamera_cameras[1].cameraPerspective,
+                   &sithCamera_cameras[2], sithCamera_cameras[2].cameraPerspective,
+                   &sithCamera_cameras[3], sithCamera_cameras[3].cameraPerspective);
+        }
+        if (_now - _cam_last > 2000) {
+            _cam_last = _now;
+            debugf("[N64] FollowFocus: cam=%p persp=%d focus=%p focus_sector=%p cam_sector=%p\n",
+                   cam, cam->cameraPerspective, focusThing,
+                   focusThing ? focusThing->sector : NULL, cam->sector);
+        }
+    }
+#endif
     switch ( cam->cameraPerspective )
     {
         case 1:
@@ -350,6 +374,18 @@ void sithCamera_FollowFocus(sithCamera *cam)
             cam->sector = sithCollision_GetSectorLookAt(focusThing->sector, &focusThing->position, &cam->viewMat.scale, 0.02);
             break;
         default:
+#ifdef TARGET_N64
+            // Fallback for uninitialized/unknown perspective: mirror case 1 basics.
+            // Also redirect the render camera to cameras[0] which has a valid frustum.
+            if (focusThing) {
+                rdMatrix_Copy34(&cam->viewMat, &focusThing->lookOrientation);
+                rdMatrix_PostTranslate34(&cam->viewMat, &focusThing->position);
+                if (focusThing->sector)
+                    cam->sector = focusThing->sector;
+            }
+            // Ensure rdCamera_pCurCamera has a valid frustum (cameras[0] is always initialized).
+            rdCamera_SetCurrent(&sithCamera_cameras[0].rdCam);
+#endif
             break;
     }
     cam->vec3_1 = cam->viewMat.scale;

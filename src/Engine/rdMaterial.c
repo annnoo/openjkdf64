@@ -345,7 +345,7 @@ LABEL_21:
         }
 #endif
 
-#if !defined(TARGET_TWL)
+#if !defined(TARGET_TWL) && !defined(TARGET_N64)
         printf("Load %s tex %d/%d mip %d/%d\n", mat_fpath, tex_numa, material->num_textures, mipmap_num, texture->num_mipmaps);
         created_tex = stdDisplay_VBufferNew(&format, create_ddraw_surface, gpu_mem, 0);
         *texture_struct = created_tex;
@@ -363,6 +363,33 @@ LABEL_21:
 #if defined(RDMATERIAL_LRU_LOAD_UNLOAD)
         material->bDataLoaded = bDoLoad;
 #endif
+
+#elif defined(TARGET_N64)
+        // Limit textures that are loaded on N64 to avoid OOM
+        // Load only if it's small (<= 32x32) OR it's the last mipmap
+        if (format.width <= 32 || mipmap_num >= texture->num_mipmaps - 1) {
+            created_tex = stdDisplay_VBufferNew(&format, create_ddraw_surface, gpu_mem, 0);
+            *texture_struct = created_tex;
+            if ( created_tex ) {
+                if ( texture->alpha_en & 1 )
+                    stdDisplay_VBufferSetColorKey(created_tex, texture->color_transparent);
+                stdDisplay_VBufferLock(*texture_struct);
+                rdroid_pHS->fileRead(
+                    mat_file__,
+                    (void *)(*texture_struct)->surface_lock_alloc,
+                    (*texture_struct)->format.texture_size_in_bytes);
+                stdDisplay_VBufferUnlock(*texture_struct);
+#if defined(RDMATERIAL_LRU_LOAD_UNLOAD)
+                material->bDataLoaded = bDoLoad;
+#endif
+            } else {
+                // Skip if allocation failed even for small mip
+                std_pHS->fseek(mat_file__, format.width*format.height*(format.format.is16bit?2:1), SEEK_CUR);
+            }
+        }
+        else {
+            std_pHS->fseek(mat_file__, format.width*format.height*(format.format.is16bit?2:1), SEEK_CUR);
+        }
 
 #else
         // Limit textures that are loaded on TWL

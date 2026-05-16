@@ -18,29 +18,44 @@ int sithKeyFrame_Load(sithWorld *world, int a2)
     if ( a2 )
         return 0;
 
-    stdConffile_ReadArgs();
-    if ( _memcmp(stdConffile_entry.args[0].value, "world", 6u) || _memcmp(stdConffile_entry.args[1].value, "keyframes", 0xAu) )
+    stdPlatform_Printf("sithKeyFrame_Load: Reading world keyframes header...\n");
+    if ( !stdConffile_ReadArgs() ) {
+        stdPlatform_Printf("sithKeyFrame_Load: FAILED - stdConffile_ReadArgs returned 0\n");
         return 0;
+    }
+    
+    stdPlatform_Printf("sithKeyFrame_Load: Header line: '%s' '%s' '%s'\n", 
+        stdConffile_entry.args[0].value, stdConffile_entry.args[1].value, stdConffile_entry.args[2].value);
+
+    if ( __strcmpi(stdConffile_entry.args[0].value, "world") || __strcmpi(stdConffile_entry.args[1].value, "keyframes") ) {
+        stdPlatform_Printf("sithKeyFrame_Load: FAILED - section header mismatch\n");
+        return 0;
+    }
 
     int numKeyframes = _atoi(stdConffile_entry.args[2].value);
+    stdPlatform_Printf("sithKeyFrame_Load: Loading %d keyframes...\n", numKeyframes);
     if ( !numKeyframes )
         return 1;
 
     percent_delta = 15.0 / (flex_d_t)numKeyframes;
     if ( !sithKeyFrame_New(world, numKeyframes) )
     {
+        stdPlatform_Printf("sithKeyFrame_Load: FAILED - sithKeyFrame_New OOM (num=%d)\n", numKeyframes);
         stdPrintf(pSithHS->errorPrint, ".\\Engine\\sithPuppet.c", 1538, "Memory error while reading keyframes, line %d.\n", stdConffile_linenum, 0, 0, 0);
         return 0;
     }
 
     while ( stdConffile_ReadArgs() )
     {
-        if ( !_memcmp(stdConffile_entry.args[0].value, "end", 4u) )
+        if ( !_memcmp(stdConffile_entry.args[0].value, "end", 4u) ) {
+            stdPlatform_Printf("sithKeyFrame_Load: Finished section\n");
             return 1;
+        }
         
         // Weird inline?
         if ( !sithKeyFrame_LoadEntry(stdConffile_entry.args[1].value) )
         {
+            stdPlatform_Printf("sithKeyFrame_Load: FAILED - sithKeyFrame_LoadEntry('%s')\n", stdConffile_entry.args[1].value);
             stdPrintf(
                 pSithHS->errorPrint,
                 ".\\Engine\\sithPuppet.c",

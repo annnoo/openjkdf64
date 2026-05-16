@@ -73,9 +73,12 @@ int stdConffile_OpenModeCommon(char *fpath, const char* mode, BOOL bBypassGobs)
     }
     else
     {
+        stdPlatform_Printf("stdConffile_OpenRead: Opening '%s' (bypass=%d)...\n", fpath, bBypassGobs);
         openFile = stdConffile_pHS->fileOpen(fpath, mode); // Added: std_pHS -> stdConffile_pHS
-        if (!openFile)
+        if (!openFile) {
+            stdPlatform_Printf("stdConffile_OpenRead: FAILED to open '%s'\n", fpath);
             goto fail_open;
+        }
     }
 
     stdConffile_aLine = (char*)std_pHS->alloc(STDCONF_LINEBUFFER_LEN);

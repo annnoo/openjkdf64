@@ -1,6 +1,54 @@
 #ifndef _OPENJKDF2_ENGINE_CONFIG_H
 #define _OPENJKDF2_ENGINE_CONFIG_H
 
+// --- Platform-specific feature and optimization flags ---
+// MUST be defined before ANY includes to ensure consistent structure layouts
+
+#ifdef QOL_IMPROVEMENTS
+#define JKM_LIGHTING
+#define JKM_BONES
+#define JKM_PARAMS
+#define JKM_AI
+#define JKM_SABER
+#define JKM_DSS
+#define JKM_CAMERA
+#define DW_CAMERA
+#endif
+
+#if defined(TARGET_TWL) || defined(TARGET_N64)
+#define NO_JK_MMAP
+#define OPTIMIZE_AWAY_UNUSED_FIELDS
+#define RDMATERIAL_LRU_LOAD_UNLOAD
+#define RDMATERIAL_MINIMIZE_STRUCTS
+#define STDBITMAP_PARTIAL_LOAD
+#define JKGUI_SMOL_SCREEN
+#define RDCLIP_WORK_BUFFERS_IN_STACK_MEM
+#define RDCLIP_CLIP_ZFAR_FIRST
+#define SITHRENDER_SPHERE_TEST_SURFACES
+#define RDCACHE_RENDER_NGONS
+
+// stdHashTable memory optimizations
+#define STDHASHTABLE_CRC32_KEYS
+#define STDHASHTABLE_LOG2_BUCKETS
+#define STDHASHTABLE_SINGLE_LINKLIST
+
+// COG memory optimizations
+#define COG_DYNAMIC_STACKS
+#define COG_DYNAMIC_IDK
+#define COG_DYNAMIC_TRIGGERS
+#define COG_DYNAMIC_STACKS_INCREMENT (32)
+#define COG_CRC32_SYMBOL_NAMES
+#define COG_COMPRESS_VAR_SIZE
+
+// Other memory optimizations
+#define SITHAI_CRC32_INSTINCTS
+#endif
+
+#ifdef EXPERIMENTAL_FIXED_POINT
+#define FIXED_POINT_DECIMAL_BITS (16)
+#define FIXED_POINT_WHOLE_BITS   (32-FIXED_POINT_DECIMAL_BITS)
+#endif
+
 #include <float.h>
 #include "types_enums.h"
 
@@ -166,22 +214,6 @@
 // Run game physics at a fixed timestep
 #define FIXED_TIMESTEP_PHYS
 
-// Backport MOTS RGB lighting and bone changes
-#ifdef QOL_IMPROVEMENTS
-#define JKM_LIGHTING
-#define JKM_BONES
-#define JKM_PARAMS
-#define JKM_AI
-#define JKM_SABER
-#define JKM_DSS
-#define JKM_CAMERA
-#endif
-
-// Backport Droidworks misc
-#ifdef QOL_IMPROVEMENTS
-#define DW_CAMERA
-#endif
-
 #if defined(TARGET_TWL) || defined(TARGET_N64)
 #define JKPLAYER_NUM_INFOS (11)
 #else
@@ -298,74 +330,13 @@
 #if defined(TARGET_TWL)
 #undef SITH_DEBUG_STRUCT_NAMES
 
-// stdHashTable memory optimizations
-#define STDHASHTABLE_CRC32_KEYS
-#define STDHASHTABLE_LOG2_BUCKETS
-#define STDHASHTABLE_SINGLE_LINKLIST
-
-// COG memory optimizations
-#define COG_DYNAMIC_STACKS
-#define COG_DYNAMIC_IDK
-#define COG_DYNAMIC_TRIGGERS
-#define COG_DYNAMIC_STACKS_INCREMENT (32)
-#define COG_CRC32_SYMBOL_NAMES
-#define COG_COMPRESS_VAR_SIZE
-
-// Other memory optimizations
-#define SITHAI_CRC32_INSTINCTS
-
 // Suggest which heaps to place things in 
 // (fast NWRAM, slow swap, etc)
 #define STDPLATFORM_HEAP_SUGGESTIONS
-
-// Deferred material loading and LRU unloading
-#define RDMATERIAL_LRU_LOAD_UNLOAD
-#define RDMATERIAL_MINIMIZE_STRUCTS
-
-// Halve the x/y positions/sizes for all jkGui elements
-#define JKGUI_SMOL_SCREEN
-
-// Keep rdClip buffers in stack (DTCM)
-#define RDCLIP_WORK_BUFFERS_IN_STACK_MEM
-//#define RDCLIP_COPY_VERTS_TO_STACK
-#define RDCLIP_CLIP_ZFAR_FIRST
-#define SITHRENDER_SPHERE_TEST_SURFACES
-#define RDCACHE_RENDER_NGONS
-#define STDBITMAP_PARTIAL_LOAD
 #endif
 
 #if defined(TARGET_N64)
 #undef SITH_DEBUG_STRUCT_NAMES
-
-// stdHashTable memory optimizations
-#define STDHASHTABLE_CRC32_KEYS
-#define STDHASHTABLE_LOG2_BUCKETS
-#define STDHASHTABLE_SINGLE_LINKLIST
-
-// COG memory optimizations
-#define COG_DYNAMIC_STACKS
-#define COG_DYNAMIC_IDK
-#define COG_DYNAMIC_TRIGGERS
-#define COG_DYNAMIC_STACKS_INCREMENT (32)
-#define COG_CRC32_SYMBOL_NAMES
-#define COG_COMPRESS_VAR_SIZE
-
-// Other memory optimizations
-#define SITHAI_CRC32_INSTINCTS
-
-// Deferred material loading and LRU unloading
-#define RDMATERIAL_LRU_LOAD_UNLOAD
-#define RDMATERIAL_MINIMIZE_STRUCTS
-
-// N64 is 320x240 but JK GUI was designed for 640x480 — halve all UI coords
-#define JKGUI_SMOL_SCREEN
-
-// Keep rdClip buffers in stack
-#define RDCLIP_WORK_BUFFERS_IN_STACK_MEM
-#define RDCLIP_CLIP_ZFAR_FIRST
-#define SITHRENDER_SPHERE_TEST_SURFACES
-#define RDCACHE_RENDER_NGONS
-#define STDBITMAP_PARTIAL_LOAD
 #endif
 
 #define RDCACHE_RENDER_LINES
@@ -394,10 +365,6 @@
 #define REGISTRY_FNAME ("registry.json")
 #endif
 
-#define STDUPDATER_DEFAULT_URL ("https://api.github.com/repos/shinyquagsire23/OpenJKDF2/releases?per_page=1")
-#define STDUPDATER_DEFAULT_WIN64_FILENAME ("win64-debug.zip")
-#define STDUPDATER_DEFAULT_MACOS_FILENAME ("macos-debug.tar.gz")
-
 #define DF2_ONLY_COND(cond) ( Main_bMotsCompat || (!Main_bMotsCompat && (cond)) )
 #define MOTS_ONLY_COND(cond) ( !Main_bMotsCompat || (Main_bMotsCompat && (cond)) )
 #define MOTS_ONLY_FLAG(_flag) (Main_bMotsCompat ? (_flag) : (0))
@@ -420,14 +387,6 @@ extern int Window_isHiDpi;
 // - TODO: fixed point support?
 typedef float flex_t_type; // _Float16
 typedef double flex_d_t_type;
-
-// Fixed point experiment
-#ifdef EXPERIMENTAL_FIXED_POINT
-#define FIXED_POINT_DECIMAL_BITS (16)
-#define FIXED_POINT_WHOLE_BITS   (32-FIXED_POINT_DECIMAL_BITS)
-//#define RENDER_ROUND_VERTICES
-#define OPTIMIZE_AWAY_UNUSED_FIELDS
-#endif
 
 #define FLEX(n) ((flex_t)n)
 

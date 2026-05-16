@@ -8,6 +8,9 @@
 #include "stdPlatform.h"
 
 #include <math.h>
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
 
 #ifdef RDCACHE_RENDER_LINES
 static int rdCache_totalLines = 0;
@@ -36,7 +39,7 @@ int rdCache_Startup()
 
 void rdCache_AdvanceFrame()
 {
-#if defined(SDL2_RENDER)
+#if defined(SDL2_RENDER) || defined(TARGET_N64)
     rdroid_curAcceleration = 1;
 #endif
 
@@ -44,7 +47,7 @@ void rdCache_AdvanceFrame()
     rdCache_dword_865258 = 16;
 #endif
 
-#if !defined(SDL2_RENDER) && !defined(TARGET_TWL)
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
     if ( rdroid_curAcceleration > 0 )
 #endif
         std3D_StartScene();
@@ -130,7 +133,7 @@ void rdCache_Flush()
         _qsort(rdCache_aProcFaces, rdCache_numProcFaces, sizeof(rdProcEntry), (int (__cdecl *)(const void *, const void *))rdCache_ProcFaceCompare);
 #endif
     }
-#if !defined(SDL2_RENDER) && !defined(TARGET_TWL)
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
     if ( rdroid_curAcceleration <= 0 )
     {
         if ( rdroid_curOcclusionMethod )
@@ -408,7 +411,7 @@ int rdCache_SendFaceListToHardware()
         }
         else {
             rdMaterial_EnsureData(v11.material);
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
             // Added: fall back to colors with no data
             if (!v11.material->bDataLoaded) {
                 v11.mipmap_related = 3;
@@ -418,9 +421,16 @@ int rdCache_SendFaceListToHardware()
         }
         
 #if defined(RDMATERIAL_LRU_LOAD_UNLOAD)
+#ifdef TARGET_N64
+        // N64: solidcolor fallback needs no texture data — always allow through
+        if (!(v11.material->bDataLoaded || (v11.material->bMetadataLoaded && mipmap_related == 3) || mipmap_related == 3)) {
+            continue;
+        }
+#else
         if (!(v11.material->bDataLoaded || (v11.material->bMetadataLoaded && mipmap_related == 3))) {
             continue;
         }
+#endif
 #endif
 
         v14 = active_6c->wallCel;

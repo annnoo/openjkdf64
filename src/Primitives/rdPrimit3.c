@@ -926,7 +926,6 @@ void rdPrimit3_DrawCircle(rdVector3 *pVecPos, flex_t xOffs, flex_t radius, int c
 void rdPrimit3_NoClipFaceRGB
                (rdGeoMode_t geoMode,int lightMode,int texMode,rdMeshinfo *_vertexSrc,
                rdMeshinfo *_vertexDst,rdVector2 *idkIn)
-
 {
     rdVector3 *prVar1;
     flex_t *pfVar2;

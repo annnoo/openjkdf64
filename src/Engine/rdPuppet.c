@@ -147,6 +147,9 @@ void rdPuppet_BuildJointMatrices(rdThing *thing, rdMatrix34 *matrix)
     // Added: Fix a crash?
     if (!thing->hierarchyNodeMatrices) return;
 
+    // Added: Guard against NULL hierarchyNodes (model loaded without node data)
+    if (!model->hierarchyNodes) return;
+
     if ( !puppet || puppet->paused )
     {
         for (int i = 0; i < model->numHierarchyNodes; i++)
@@ -164,7 +167,17 @@ void rdPuppet_BuildJointMatrices(rdThing *thing, rdMatrix34 *matrix)
         //    stdPlatform_Printf("%d %s (%x/%u) %p %x %f\n", i, v4->keyframe->name, v4->keyframe->id, v4->keyframe->id, v4->keyframe, v4->status, v4->playSpeed);
 
         // Added: paJoints check
-        if (!(v4->status && v4->keyframe && v4->keyframe->paJoints)) {
+        if (!(v4->status && v4->keyframe)) {
+            continue;
+        }
+
+#ifdef TARGET_N64
+        if (!rdKeyframe_EnsureLoaded(v4->keyframe)) {
+            continue;
+        }
+#endif
+        
+        if (!v4->keyframe->paJoints) {
             continue;
         }
         
@@ -272,7 +285,9 @@ void rdPuppet_BuildJointMatrices(rdThing *thing, rdMatrix34 *matrix)
                 if (v25 & 1)
                 {
                     rdVector_Copy3(&v89, &v24->pos);
+#ifndef TARGET_N64
                     rdVector_MultAcc3(&v89, &v24->vel, v23);
+#endif
                 }
                 else
                 {
@@ -281,7 +296,9 @@ void rdPuppet_BuildJointMatrices(rdThing *thing, rdMatrix34 *matrix)
                 if (v25 & 2)
                 {
                     rdVector_Copy3(&tmp1, &v24->orientation);
+#ifndef TARGET_N64
                     rdVector_MultAcc3(&tmp1, &v24->angVel, v23);
+#endif
                 }
                 else
                 {
@@ -574,6 +591,7 @@ void rdPuppet_AdvanceTrack(rdPuppet *puppet, int trackNum, flex_t a3)
     }
     if ( puppet->tracks[trackNum].callback )
     {
+#ifndef TARGET_N64
         if ( v4->numMarkers )
         {
             if ( v21 == 0.0 )
@@ -607,6 +625,7 @@ void rdPuppet_AdvanceTrack(rdPuppet *puppet, int trackNum, flex_t a3)
                 }
             }
         }
+#endif
     }
 
     if ( v20 )

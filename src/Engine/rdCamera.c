@@ -12,7 +12,7 @@
 static rdVector3 rdCamera_camRotation;
 static flex_t rdCamera_mipmapScalar = 1.0; // MOTS added
 
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
 int rdCamera_bForceRealProj = 0;
 #endif
 
@@ -36,7 +36,7 @@ int rdCamera_NewEntry(rdCamera *camera, flex_t fov, BOOL bClipFar, flex_t zNear,
     if (!camera)
         return 0;
 
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
     bClipFar = 1;
 #endif
 
@@ -146,7 +146,7 @@ int rdCamera_SetProjectType(rdCamera *camera, int type)
             {
                 camera->fnProject = rdCamera_OrthoProjectSquare;
                 camera->fnProjectLst = rdCamera_OrthoProjectSquareLst;
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
                 camera->fnProjectLstClip = rdCamera_OrthoProjectSquareLst;
 #endif
             }
@@ -154,7 +154,7 @@ int rdCamera_SetProjectType(rdCamera *camera, int type)
             {
                 camera->fnProject = rdCamera_OrthoProject;
                 camera->fnProjectLst = rdCamera_OrthoProjectLst;
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
                 camera->fnProjectLstClip = rdCamera_OrthoProjectLst;
 #endif
             }
@@ -166,7 +166,7 @@ int rdCamera_SetProjectType(rdCamera *camera, int type)
             {
                 camera->fnProject = rdCamera_PerspProjectSquare;
                 camera->fnProjectLst = rdCamera_PerspProjectSquareLst;
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
                 camera->fnProjectLstClip = rdCamera_PerspProjectLstClip;
                 if (rdCamera_bForceRealProj) {
                     camera->fnProject = rdCamera_PerspProjectClip;
@@ -178,7 +178,7 @@ int rdCamera_SetProjectType(rdCamera *camera, int type)
             {
                 camera->fnProject = rdCamera_PerspProject;
                 camera->fnProjectLst = rdCamera_PerspProjectLst;
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
                 camera->fnProjectLstClip = rdCamera_PerspProjectLstClip;
                 if (rdCamera_bForceRealProj) {
                     camera->fnProject = rdCamera_PerspProjectClip;
@@ -260,17 +260,12 @@ int rdCamera_BuildFOV(rdCamera *camera)
             
             flex_t tangent = stdMath_Tan(camera->fov * 0.5);
             camera->fovDx = project_width_half / tangent;
+            if (camera->fovDx == 0.0) {
+                camera->fovDx = 0.000001;
+            }
 
             flex_t fovDx = camera->fovDx;
             flex_t fovDy = camera->fovDx;
-
-            // UBSAN fixes
-            if (fovDy == 0) {
-                fovDy = 0.000001;
-            }
-            if (fovDx == 0) {
-                fovDx = 0.000001;
-            }
 
             // This area is very susceptible to fixed-point error 
 #ifdef EXPERIMENTAL_FIXED_POINT
@@ -402,7 +397,7 @@ void rdCamera_OrthoProjectSquareLst(rdVector3 *vertices_out, const rdVector3 *ve
 // DSi needs an aspect divide, OpenGL wants nothing??
 void rdCamera_PerspProject(rdVector3 *out, const rdVector3 *v)
 {
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL)
     // DSi does HW projection
     out->x = v->x;
     out->y = v->y;
@@ -419,7 +414,7 @@ void rdCamera_PerspProject(rdVector3 *out, const rdVector3 *v)
 
 void rdCamera_PerspProjectLst(rdVector3 *pVerticesOut, const rdVector3 *pVerticesIn, unsigned int numVertices)
 {
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL)
     // DSi does HW projection
     memcpy(pVerticesOut, pVerticesIn, numVertices * sizeof(rdVector3));
     return;
@@ -433,7 +428,7 @@ void rdCamera_PerspProjectLst(rdVector3 *pVerticesOut, const rdVector3 *pVertice
     }
 }
 
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
 void rdCamera_PerspProjectClip(rdVector3 *out, const rdVector3 *v)
 {
     flex_t fov_y_calc = (rdCamera_pCurCamera->fovDx / v->y);
@@ -457,7 +452,7 @@ void rdCamera_PerspProjectLstClip(rdVector3 *pVerticesOut, const rdVector3 *pVer
 
 void rdCamera_PerspProjectSquare(rdVector3 *out, const rdVector3 *v)
 {
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL)
     // DSi does HW projection
     out->x = v->x;
     out->y = v->y;
@@ -472,7 +467,7 @@ void rdCamera_PerspProjectSquare(rdVector3 *out, const rdVector3 *v)
 
 void rdCamera_PerspProjectSquareLst(rdVector3 *pVerticesOut, const rdVector3 *pVerticesIn, unsigned int numVertices)
 {
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL)
     memcpy(pVerticesOut, pVerticesIn, numVertices * sizeof(rdVector3));
     return;
 #endif

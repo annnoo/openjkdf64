@@ -1,4 +1,7 @@
 #include "rdModel3.h"
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
 
 #include "Engine/rdroid.h"
 #include "General/stdConffile.h"
@@ -14,6 +17,7 @@
 #include "Engine/rdColormap.h"
 #include "Primitives/rdPrimit3.h"
 #include "Primitives/rdDebug.h"
+#include "World/sithWorld.h"
 
 #ifdef TARGET_N64
 #include <t3d/t3d.h>
@@ -102,47 +106,78 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
     int version_major; // [esp+90h] [ebp-4h]
     int geoset_num;
 
+#ifdef TARGET_N64
+    int id_tmp = model->id;
+    char fpath_tmp[64];
+    stdString_SafeStrCopy(fpath_tmp, model->fpath, 64);
+#endif
+
     rdModel3_NewEntry(model);
+
+#ifdef TARGET_N64
+    model->id = id_tmp;
+    stdString_SafeStrCopy(model->fpath, fpath_tmp, 64);
+    if (model_fpath == NULL) model_fpath = model->fpath;
+#endif
+
     stdString_SafeStrCopy(model->filename, stdFileFromPath(model_fpath), 32);
+#ifdef TARGET_N64
+    stdString_SafeStrCopy(model->fpath, model_fpath, 64);
+#endif
+
     if ( !stdConffile_OpenRead(model_fpath) )
         return 0;
 
     if (!stdConffile_ReadLine())
-        return 0;
+        goto fail;
 
     if ( _sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1 )
-        return 0;
+        goto fail;
 
     if (!stdConffile_ReadLine())
-        return 0;
+        goto fail;
 
     _sscanf(stdConffile_aLine, " 3do %d.%d", &version_major, &version_minor);
     if (!stdConffile_ReadLine())
-        return 0;
+        goto fail;
 
     if ( _sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1
       || !stdConffile_ReadLine()
       || _sscanf(stdConffile_aLine, " materials %d", &model->numMaterials) != 1 )
-        return 0;
+        goto fail;
 
-    if ( model->numMaterials)
+#ifdef TARGET_N64
+    if (sithWorld_pLoading)
     {
-        model->materials = (rdMaterial **)rdroid_pHS->alloc(sizeof(rdMaterial*) * model->numMaterials);
-        if (!model->materials)
-            return 0;
+        model->materials = NULL;
+        for (int i = 0; i < model->numMaterials; i++)
+        {
+            if (!stdConffile_ReadLine())
+                goto fail;
+        }
     }
-    for (int i = 0; i < model->numMaterials; i++)
+    else
+#endif
     {
-        if (!stdConffile_ReadLine())
-            goto fail;
+        if ( model->numMaterials)
+        {
+            model->materials = (rdMaterial **)rdroid_pHS->alloc(sizeof(rdMaterial*) * model->numMaterials);
+            if (!model->materials)
+                goto fail;
+        }
+        for (int i = 0; i < model->numMaterials; i++)
+        {
+            if (!stdConffile_ReadLine())
+                goto fail;
 
-        if ( _sscanf(stdConffile_aLine, " %d: %s", &geoset_num, std_genBuffer) != 2 )
-            goto fail;
+            if ( _sscanf(stdConffile_aLine, " %d: %s", &geoset_num, std_genBuffer) != 2 )
+                goto fail;
 
-        model->materials[i] = rdMaterial_Load(std_genBuffer, 0, 0);
+            model->materials[i] = rdMaterial_Load(std_genBuffer, 0, 0);
 
-        if ( !model->materials[i] )
-            goto fail;
+            if ( !model->materials[i] )
+                goto fail;
+        }
     }
 
     if (!stdConffile_ReadLine())
@@ -172,6 +207,24 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
 
     if ( _sscanf(stdConffile_aLine, " geosets %d", &model->numGeosets) != 1 )
         goto fail;
+
+#ifdef TARGET_N64
+    if (sithWorld_pLoading)
+    {
+        while (stdConffile_ReadLine())
+        {
+            if (_sscanf(stdConffile_aLine, " hierarchy nodes %d", &model->numHierarchyNodes) == 1)
+            {
+                break;
+            }
+        }
+        model->bLoaded = 0;
+        stdConffile_Close();
+        return 1;
+    }
+    model->bLoaded = 1;
+#endif
+
     for (v78 = 0; v78 < model->numGeosets; v78++)
     {
         if (!stdConffile_ReadLine())
@@ -342,7 +395,7 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
                 v36 = _atoi(tmpTxt);
                 face->num = j;
                 // Added: model->numMaterials bounds
-                if (v36 > model->numMaterials) {
+                if (v36 >= (int)model->numMaterials) {
                     v36 = model->numMaterials-1;
                 }
                 else if (v36 < 0 && v36 != -1) {
@@ -501,7 +554,15 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
         node->pivot.z = pivot_z; // FLEXTODO
     }
 
-    rdModel3_CalcNumParents(model); // MOTS added
+    for (idx = 0; idx < model->numHierarchyNodes; idx++)
+    {
+        node = &model->hierarchyNodes[idx];
+        rdMatrix_Build34(&node->posRotMatrix, &node->rot, &node->pos);
+    }
+
+    if (model->hierarchyNodes) {
+        rdModel3_CalcNumParents(model); // MOTS added
+    }
 
     #ifdef TARGET_N64
     for (int g = 0; g < model->numGeosets; g++) {
@@ -551,10 +612,12 @@ fail:
 // from editor?
 void rdModel3_LoadPostProcess(rdModel3 *model)
 {
-    rdModel3_CalcBoundingBoxes(model);
-    rdModel3_CalcFaceNormals(model);
-    rdModel3_CalcVertexNormals(model);
-    rdModel3_CalcNumParents(model); // MOTS added
+    if (model->hierarchyNodes) {
+        rdModel3_CalcBoundingBoxes(model);
+        rdModel3_CalcFaceNormals(model);
+        rdModel3_CalcVertexNormals(model);
+        rdModel3_CalcNumParents(model); // MOTS added
+    }
 }
 
 // MOTS added
@@ -600,7 +663,11 @@ int rdModel3_WriteText(char *fout, rdModel3 *model, char *createdfrom)
     rdroid_pHS->filePrintf(fd, "MATERIALS %d\n\n", model->numMaterials);
     for (int i = 0; i < model->numMaterials; i++)
     {
+#ifdef SITH_DEBUG_STRUCT_NAMES
             rdroid_pHS->filePrintf(fd, "%10d:%15s\n", i, model->materials[i]->mat_fpath);
+#else
+            rdroid_pHS->filePrintf(fd, "%10d: (no name)\n", i);
+#endif
     }
     rdroid_pHS->filePrintf(fd, "\n\n");
     rdroid_pHS->filePrintf(fd, "###############\n");
@@ -841,7 +908,7 @@ void rdModel3_FreeEntry(rdModel3 *model)
     if ( model->hierarchyNodes )
         rdroid_pHS->free(model->hierarchyNodes);
 
-    if ( model->numMaterials )
+    if ( model->numMaterials && model->materials )
     {
         for (int i = 0; i < model->numMaterials; i++)
         {
@@ -1179,6 +1246,9 @@ int rdModel3_GetMeshMatrix(rdThing *thing, rdMatrix34 *matrix, uint32_t nodeIdx,
     if ( thing->frameTrue != rdroid_frameTrue )
         rdPuppet_BuildJointMatrices(thing, matrix);
 
+#ifdef TARGET_N64
+    if (!thing->hierarchyNodeMatrices) return 0;
+#endif
     _memcpy(out, &thing->hierarchyNodeMatrices[nodeIdx], sizeof(rdMatrix34));
     return 1;
 }
@@ -1187,6 +1257,29 @@ int rdModel3_ReplaceMesh(rdModel3 *model, int geosetIdx, int meshIdx, rdMesh *in
 {
     _memcpy(&model->geosets[geosetIdx].meshes[meshIdx], in, sizeof(model->geosets[geosetIdx].meshes[meshIdx]));
     return 1;
+}
+
+int rdModel3_EnsureLoaded(rdModel3 *model)
+{
+#ifdef TARGET_N64
+    if (!model) return 0;
+    if (model->bLoaded) return 1;
+    debugf("[N64] rdModel3_EnsureLoaded: lazy load '%s' pLoading=%p pCurrent=%p\n",
+           model->fpath ? model->fpath : "(null)",
+           sithWorld_pLoading, sithWorld_pCurrentWorld);
+    sithWorld* prevLoading = sithWorld_pLoading;
+    sithWorld_pLoading = sithWorld_pCurrentWorld;  // Option 1 fix: use current world, not NULL
+    int ret = rdModel3_Load(model->fpath, model);
+    sithWorld_pLoading = prevLoading;
+    if (!ret) {
+        debugf("[N64] rdModel3_EnsureLoaded: FAILED to load '%s'\n",
+               model->fpath ? model->fpath : "(null)");
+    }
+    model->bLoaded = 1; // Always mark after attempt (success or fail) to prevent infinite retry
+    return ret;
+#else
+    return 1;
+#endif
 }
 
 // MOTS altered (RGB lights)
@@ -1203,6 +1296,10 @@ int rdModel3_Draw(rdThing *thing, rdMatrix34 *matrix_4_3)
     
     pCurThing = thing;
     pCurModel3 = thing->model3;
+
+#ifdef TARGET_N64
+    if (!rdModel3_EnsureLoaded(pCurModel3)) return 0;
+#endif
     
     if (rdroid_curCullFlags & 2) {
         rdVector3 vertex_out;
@@ -1285,6 +1382,19 @@ int rdModel3_Draw(rdThing *thing, rdMatrix34 *matrix_4_3)
     }
     
     // JKDF2 inlined
+#ifdef TARGET_N64
+    if (!pCurModel3->hierarchyNodes || !pCurThing->hierarchyNodeMatrices) {
+        // Fallback: hierarchy failed to load — draw all geoset meshes directly
+        // using the thing's world matrix so we get *something* on screen.
+        if (rdModel3_pCurGeoset) {
+            for (int _m = 0; _m < rdModel3_pCurGeoset->numMeshes; _m++) {
+                rdModel3_DrawMesh(&rdModel3_pCurGeoset->meshes[_m], matrix_4_3);
+            }
+        }
+        ++rdModel3_numDrawnModels;
+        return 1;
+    }
+#endif
     rdModel3_DrawHNode(pCurModel3->hierarchyNodes);
 #if 0
     rdDebug_DrawBoundingBox(matrix_4_3, pCurModel3->radius, 0xFF0000FF);
@@ -1373,8 +1483,14 @@ void rdModel3_DrawMesh(rdMesh *meshIn, rdMatrix34 *mat)
     rdMatrix34 out;
 
     pCurMesh = meshIn;
+#ifdef TARGET_N64
+    // Force a minimum geometry mode so partial-load meshes still render.
+    if (!meshIn->geometryMode)
+        meshIn->geometryMode = RD_GEOMODE_SOLIDCOLOR;
+#else
     if ( !meshIn->geometryMode )
         return;
+#endif
     
     if (thingFrustumCull != SPHERE_FULLY_INSIDE) {
         rdVector3 vertex_out;
@@ -1534,6 +1650,23 @@ void rdModel3_DrawMesh(rdMesh *meshIn, rdMatrix34 *mat)
     // Be extra sure we're setting backface culling
 #ifdef TARGET_TWL
     rdroid_curRenderOptions |= 1;
+#endif
+#ifdef TARGET_N64
+    // Disable backface culling temporarily so all faces render
+    rdroid_curRenderOptions &= ~1u;
+#endif
+
+#ifdef TARGET_N64
+    static uint32_t n64_face_stats_timer = 0;
+    static uint32_t n64_faces_drawn = 0, n64_faces_backface = 0;
+    uint32_t now_ms_face = stdPlatform_GetTimeMsec();
+    if (now_ms_face - n64_face_stats_timer > 2000) {
+        debugf("[N64] DrawMesh faces: drawn=%lu backface=%lu mesh_geo=%d\n",
+               (unsigned long)n64_faces_drawn, (unsigned long)n64_faces_backface,
+               (int)meshIn->geometryMode);
+        n64_faces_drawn = 0; n64_faces_backface = 0;
+        n64_face_stats_timer = now_ms_face;
+    }
 #endif
 
     for (int i = 0; i < meshIn->numFaces; i++)

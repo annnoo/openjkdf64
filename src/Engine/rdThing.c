@@ -1,5 +1,6 @@
 #include "rdThing.h"
 
+#include <libdragon.h>
 #include "Engine/rdroid.h"
 #include "Engine/rdPuppet.h"
 #include "Primitives/rdMatrix.h"
@@ -39,6 +40,12 @@ void rdThing_Free(rdThing *thing)
 {
     if ( thing )
     {
+        extern char __bss_start[];
+        extern char __bss_end[];
+        if ((char*)thing >= __bss_start && (char*)thing < __bss_end) {
+            debugf("[N64] ERROR: rdThing_Free called on BSS pointer %p!\n", thing);
+            return;
+        }
         rdThing_FreeEntry(thing);
         rdroid_pHS->free(thing);
     }
@@ -105,11 +112,13 @@ int rdThing_SetModel3(rdThing *thing, rdModel3 *model)
 
     _memset(thing->amputatedJoints, 0, sizeof(int) * model->numHierarchyNodes);
 
-    rdHierarchyNode* iter = model->hierarchyNodes;
-    for (int i = 0; i < model->numHierarchyNodes; i++)
-    {
-        rdMatrix_Build34(&iter->posRotMatrix, &iter->rot, &iter->pos);
-        iter++;
+    if (model->hierarchyNodes) {
+        rdHierarchyNode* iter = model->hierarchyNodes;
+        for (int i = 0; i < model->numHierarchyNodes; i++)
+        {
+            rdMatrix_Build34(&iter->posRotMatrix, &iter->rot, &iter->pos);
+            iter++;
+        }
     }
     return 1;
 }

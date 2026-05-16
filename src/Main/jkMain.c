@@ -136,6 +136,9 @@ int jkMain_SetVideoMode()
         thing_six = 0;
     }
     _memcpy(&Video_modeStruct, &Video_modeStruct2, sizeof(Video_modeStruct));
+#ifdef TARGET_N64
+    Video_modeStruct.b3DAccel = 1;
+#endif
     jkGuiDisplay_sub_4149C0();
     if ( Video_SetVideoDesc(sithWorld_pCurrentWorld->colormaps->colors) )
     {
@@ -143,6 +146,16 @@ LABEL_12:
         Windows_InitGdi(stdDisplay_pCurDevice->video_device[0].windowedMaybe);
         jkGame_isDDraw = 1;
         result = 1;
+#ifdef TARGET_N64
+        // Mirror what the SDL2/QOL jkMain_SetVideoMode does for render mode init
+        sithRender_SetGeoMode(Video_modeStruct.geoMode);
+        sithRender_SetLightMode(Video_modeStruct.lightMode);
+        sithRender_SetTexMode(Video_modeStruct.texMode);
+        // Create a canvas for camera frustum/projection (bIdk=3: use explicit w/h, no vbuf needed)
+        rdCanvas_Free(Video_pCanvas);
+        Video_pCanvas = rdCanvas_New(3, NULL, NULL, 0, 0, Window_xSize - 1, Window_ySize - 1, 6);
+        sithCamera_Open(Video_pCanvas, (flex_t)Window_xSize);
+#endif
     }
     else
     {
@@ -678,8 +691,10 @@ LABEL_28:
         }
     }
 
+    stdPlatform_Printf("jkMain_GameplayShow: Attempting jkMain_SetVideoMode...\n");
     if ( jkMain_SetVideoMode() )
     {
+        stdPlatform_Printf("jkMain_GameplayShow: SetVideoMode SUCCESS. Entering jkGame_Update...\n");
         stdControl_ToggleCursor(1);
         stdControl_Flush();
         jkGame_Update();
@@ -687,6 +702,7 @@ LABEL_28:
     }
     else
     {
+        stdPlatform_Printf("jkMain_GameplayShow: SetVideoMode FAILED!\n");
         if ( jkGuiRend_thing_five )
             jkGuiRend_thing_four = 1;
         jkSmack_stopTick = 1;
@@ -1541,6 +1557,7 @@ void jkMain_FixRes()
     uint32_t newW = Window_xSize;
     uint32_t newH = Window_ySize;
 
+#ifndef TARGET_N64
     //if (jkGame_isDDraw)
     {
         newW = (uint32_t)((flex_t)Window_xSize * ((480.0*2.0)/Window_ySize));
@@ -1584,6 +1601,7 @@ void jkMain_FixRes()
     
     Video_format.width = newW;
     Video_format.height = newH;
+#endif
     
     jkDev_Close();
     jkHud_Close();

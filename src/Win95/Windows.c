@@ -100,13 +100,13 @@ void Windows_InitGdi(int windowed)
 {
     Windows_bInittedGdi = 1;
 
-#ifndef SDL2_RENDER
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
     jk_SetFocus(stdGdi_GetHwnd());
     jk_SetActiveWindow(stdGdi_GetHwnd());
 #endif
 
     Windows_bWindowed = windowed;
-#ifndef SDL2_RENDER
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
     if ( windowed )
         stdControl_ShowCursor(0);
     else
@@ -120,13 +120,13 @@ void Windows_InitGdi(int windowed)
 
 void Windows_ShutdownGdi()
 {
-#ifndef SDL2_RENDER
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
     if ( Windows_bInittedGdi )
 #endif
     {
         Windows_bInittedGdi = 0;
         Window_RemoveMsgHandler(Windows_GdiHandler);
-#ifndef SDL2_RENDER
+#if !defined(SDL2_RENDER) && !defined(TARGET_TWL) && !defined(TARGET_N64)
         if ( Windows_bWindowed )
             stdControl_ShowCursor(1);
 #endif

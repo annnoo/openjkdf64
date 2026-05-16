@@ -264,7 +264,11 @@ int rdParticle_Write(char *writePath, rdParticle *particle, char *madeBy)
     rdroid_pHS->filePrintf(v3, "SECTION: HEADER\n\n");
     rdroid_pHS->filePrintf(v3, "PAR %d.%d\n\n", 1, 0);
     rdroid_pHS->filePrintf(v3, "SIZE %.6f\n\n", particle->diameter);
-    rdroid_pHS->filePrintf(v3, "MATERIAL %s\n\n", particle->material->mat_fpath);
+ #ifdef SITH_DEBUG_STRUCT_NAMES
+   rdroid_pHS->filePrintf(v3, "MATERIAL %s\n\n", particle->material->mat_fpath);
+#else
+   rdroid_pHS->filePrintf(v3, "MATERIAL (no name)\n\n");
+#endif
     rdroid_pHS->filePrintf(v3, "LIGHTINGMODE %d\n\n", particle->lightingMode);
     rdroid_pHS->filePrintf(v3, "###############\n");
     rdroid_pHS->filePrintf(v3, "SECTION: GEOMETRYDEF\n\n");

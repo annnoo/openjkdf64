@@ -28,6 +28,21 @@ extern void N64_PumpIdle(void);
 #include "SDL2_helper.h"
 
 #ifdef TARGET_N64
+#define MAX_DFS_HANDLES 128
+typedef struct {
+    uint32_t handle;
+    char path[128];
+} DfsPathMap;
+static DfsPathMap g_dfs_paths[MAX_DFS_HANDLES];
+
+typedef struct {
+    int dfs_handle;
+    uint32_t file_pos;
+    uint32_t file_size;
+    uint32_t buf_pos;
+    uint32_t buf_len;
+    uint8_t buffer[4096];
+} N64BufferedFile;
 static FILE* g_n64_files[128];
 static char g_n64_paths[128][128];
 
@@ -68,6 +83,7 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
 
     // Convert backslashes, lowercase, and ensure rom:/ prefix
     char tmp[256];
+    char tmp_case[256];
     int src = 0, dst = 0;
 
     // Skip any "rom:/" prefix the caller might have added
@@ -75,19 +91,33 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
         src = 5;
     }
 
-    strcpy(tmp, "rom:/");
+    // Ensure leading slash
+    strcpy(tmp, "rom:");
     dst = 5;
 
     // Skip leading slash to avoid "rom://"
-    if (fpath[src] == '/') src++;
+    if (fpath[src] != '/') {
+        tmp[dst] = '/';
+        tmp_case[dst] = '/';
+        dst++;
+    }
+  
 
     for (; fpath[src] && dst < 254; src++, dst++) {
         char c = fpath[src];
-        if (c == '\\') c = '/';
+        char c_case = c;
+        if (c == '\\') { c = '/'; c_case = '/'; }
         else c = tolower((unsigned char)c);
         tmp[dst] = c;
+        tmp_case[dst] = c_case;
     }
     tmp[dst] = 0;
+    tmp_case[dst] = 0;
+
+    static int n64_fileopen_log_count = 0;
+    if (n64_fileopen_log_count < 50) {
+        debugf("[N64_fileOpen] normalized path: raw=\"%s\" -> \"%s\" (case=\"%s\")\n", fpath, tmp, tmp_case);
+    }
 
     FILE* f = fopen(tmp, mode);
     if (!f) {
@@ -110,6 +140,11 @@ static stdFile_t N64_stdFileOpen(const char* fpath, const char* mode)
         return 0;
     }
 
+    if (n64_fileopen_log_count < 50) {
+        debugf("[N64_fileOpen] dfs_open(\"%s\") OK handle=%d size=%lu\n", tmp, handle, (unsigned long)dfs_size(handle));
+        n64_fileopen_log_count++;
+    }
+
     N64_MapHandleToPath(f, tmp);
 
     debugf("[N64_fileOpen] fopen(\"%s\") OK\n", tmp);
@@ -123,6 +158,7 @@ const char* N64_GetPathForHandle(stdFile_t fhand)
 
 static int N64_stdFileClose(stdFile_t fhand)
 {
+    if(!fhand) return -1;
     N64_UnmapHandle((FILE*)fhand);
     return fclose((FILE*)fhand);
 }
@@ -161,12 +197,20 @@ static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
 
 static const char* N64_stdFileGets(stdFile_t fhand, char* dst, size_t len)
 {
-    return fgets(dst, len, (FILE*)fhand);
+    size_t i = 0;
+    char c;
+    while (i < len - 1) {
+        if (dfs_read(&c, 1, 1, (uint32_t)(uintptr_t)fhand) <= 0) break;
+        dst[i++] = c;
+        if (c == '\n') break;
+    }
+    dst[i] = 0;
+    return (i == 0) ? NULL : dst;
 }
 
 static int N64_stdFseek(stdFile_t fhand, int a, int b)
 {
-    return fseek((FILE*)fhand, a, b);
+    return dfs_seek((uint32_t)(uintptr_t)fhand, a, b);
 }
 
 static int N64_stdFtell(stdFile_t fhand)
@@ -991,6 +1035,16 @@ int stdPlatform_Printf(const char *fmt, ...)
     SDL_UnlockMutex(stdPlatform_mtxPrintf);
 #endif
     return ret;
+}
+#endif
+
+#ifdef TARGET_N64
+void stdPlatform_PrintHeapStats()
+{
+    heap_stats_t stats;
+    sys_get_heap_stats(&stats);
+    stdPlatform_Printf("N64 Heap: used=%d total=%d free=%d\n", 
+        stats.used, stats.total, stats.total - stats.used);
 }
 #endif
 
