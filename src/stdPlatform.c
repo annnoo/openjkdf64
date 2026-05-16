@@ -197,20 +197,14 @@ static size_t N64_stdFileWrite(stdFile_t fhand, void* dst, size_t len)
 
 static const char* N64_stdFileGets(stdFile_t fhand, char* dst, size_t len)
 {
-    size_t i = 0;
-    char c;
-    while (i < len - 1) {
-        if (dfs_read(&c, 1, 1, (uint32_t)(uintptr_t)fhand) <= 0) break;
-        dst[i++] = c;
-        if (c == '\n') break;
-    }
-    dst[i] = 0;
-    return (i == 0) ? NULL : dst;
+    if (!fhand || len <= 0) return NULL;
+    return fgets(dst, len, (FILE*)fhand);
 }
 
 static int N64_stdFseek(stdFile_t fhand, int a, int b)
 {
-    return dfs_seek((uint32_t)(uintptr_t)fhand, a, b);
+    if (!fhand) return -1;
+    return fseek((FILE*)fhand, a, b);
 }
 
 static int N64_stdFtell(stdFile_t fhand)
