@@ -65,17 +65,26 @@ int stdConsolePrintf(const char *fmt, ...);
 #ifdef TARGET_N64
 #define le16_to_cpu(x) __builtin_bswap16(x)
 #define le32_to_cpu(x) __builtin_bswap32(x)
+static inline float lef32_to_cpu(float f) {
+    union { uint32_t i; float f; } u;
+    u.f = f;
+    u.i = __builtin_bswap32(u.i);
+    return u.f;
+}
 #else
 #define le16_to_cpu(x) (x)
 #define le32_to_cpu(x) (x)
+#define lef32_to_cpu(x) (x)
+#endif
+
+#if defined(TARGET_TWL) || defined(TARGET_N64)
+void stdPlatform_PrintHeapStats();
 #endif
 
 #ifdef TARGET_TWL
 extern size_t trackingAllocsA;
 extern size_t trackingAllocsB;
 extern size_t trackingAllocsBLimit;
-
-void stdPlatform_PrintHeapStats();
 #endif
 
 #ifdef __cplusplus

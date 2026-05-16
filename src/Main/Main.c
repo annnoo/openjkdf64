@@ -289,7 +289,11 @@ int Main_Startup(const char *cmdline)
     Video_modeStruct.modeIdx = 0;
     Video_modeStruct.descIdx = 0;
     Video_modeStruct.Video_8605C8 = 0;
+#ifdef TARGET_N64
+    Video_modeStruct.b3DAccel = 1;
+#else
     Video_modeStruct.b3DAccel = 0;
+#endif
     Video_modeStruct.viewSizeIdx = 5;
     Video_modeStruct.Video_8606A4 = 0;
     Video_modeStruct.Video_8606A8 = 1;

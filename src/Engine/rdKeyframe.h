@@ -22,4 +22,8 @@ int rdKeyframe_Write(char *out_fpath, rdKeyframe *keyframe, char *creation_metho
 void rdKeyframe_FreeEntry(rdKeyframe *keyframe);
 void rdKeyframe_FreeJoints(rdKeyframe *keyframe);
 
+#ifdef TARGET_N64
+int rdKeyframe_EnsureLoaded(rdKeyframe *keyframe);
+#endif
+
 #endif // _RDKEYFRAME_H

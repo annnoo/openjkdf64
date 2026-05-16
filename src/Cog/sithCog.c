@@ -536,10 +536,22 @@ int sithCog_Load(sithWorld *world, int a2)
 
     if ( a2 )
         return 0;
-    stdConffile_ReadArgs();
-    if ( _strcmp(stdConffile_entry.args[0].value, "world") || _strcmp(stdConffile_entry.args[1].value, "cogs") )
+
+    stdPlatform_Printf("sithCog_Load: Reading header...\n");
+    if ( !stdConffile_ReadArgs() ) {
+        stdPlatform_Printf("sithCog_Load: FAILED - stdConffile_ReadArgs returned 0\n");
         return 0;
+    }
+
+    stdPlatform_Printf("sithCog_Load: tokens='%s' '%s' '%s'\n", 
+        stdConffile_entry.args[0].value, stdConffile_entry.args[1].value, stdConffile_entry.args[2].value);
+
+    if ( __strcmpi(stdConffile_entry.args[0].value, "world") || __strcmpi(stdConffile_entry.args[1].value, "cogs") ) {
+        stdPlatform_Printf("sithCog_Load: FAILED - header mismatch\n");
+        return 0;
+    }
     num_cogs = _atoi(stdConffile_entry.args[2].value);
+    stdPlatform_Printf("sithCog_Load: Loading %d cogs (sizeof=%d)...\n", num_cogs, sizeof(sithCog));
     if ( !num_cogs )
         return 1;
     cogs = (sithCog *)pSithHS->alloc(sizeof(sithCog) * num_cogs);
@@ -565,11 +577,17 @@ int sithCog_Load(sithWorld *world, int a2)
                 v23 = 0;
                 v21 = &v9->field_4BC[0];
                 v22 = 2;
-                for (v23 = 0; v23 < v9->cogscript->numIdk; v23++)
+                for (v23 = 0; v23 < v18->numIdk; v23++)
                 {
                     //printf("%s\n", stdConffile_entry.args[v22].value);
                     if ( (v18->aIdk[v23].flags & 1) == 0 && stdConffile_entry.numArgs > v22 )
                     {
+#ifdef TARGET_N64
+                        if (v23 >= 16) {
+                            stdPlatform_Printf("sithCog_Load: WARNING - too many variables in %s\n", stdConffile_entry.args[1].value);
+                            break;
+                        }
+#endif
                         stdString_SafeStrCopy(v21, stdConffile_entry.args[v22].value, 32);
                         v21 += 32;
                         ++v22;
@@ -645,8 +663,9 @@ sithCog* sithCog_LoadCogscript(const char *fpath)
 #endif
             if (sithCogBinary_Load(bcog_fpath, v8))
             {
-                stdHashTable_SetKeyVal(sithCog_pScriptHashtable, cog_fpath, v8);
+                stdHashTable_SetKeyVal(sithCog_pScriptHashtable, fpath, v8); // Changed cog_fpath -> fpath
                 ++sithWorld_pLoading->numCogScriptsLoaded;
+                // stdPlatform_Printf("COG_USE_PRECOMPILED: Loaded '%s'\n", bcog_fpath);
             }
             else
             {
@@ -1566,8 +1585,16 @@ int sithCogScript_Load(sithWorld *lvl, int a2)
 
     if ( a2 )
         return 0;
-    stdConffile_ReadArgs();
-    if ( _strcmp(stdConffile_entry.args[0].value, "world") || _strcmp(stdConffile_entry.args[1].value, "scripts") )
+    
+    if ( !stdConffile_ReadArgs() ) {
+        stdPlatform_Printf("sithCogScript_Load: FAILED - stdConffile_ReadArgs returned 0\n");
+        return 0;
+    }
+    
+    stdPlatform_Printf("sithCogScript_Load: tokens='%s' '%s' '%s'\n", 
+        stdConffile_entry.args[0].value, stdConffile_entry.args[1].value, stdConffile_entry.args[2].value);
+
+    if ( __strcmpi(stdConffile_entry.args[0].value, "world") || __strcmpi(stdConffile_entry.args[1].value, "scripts") )
         return 0;
     numCogScripts = _atoi(stdConffile_entry.args[2].value);
     if ( !numCogScripts )

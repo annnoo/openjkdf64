@@ -99,6 +99,10 @@ typedef struct rdModel3
 {
     char filename[32];
     int id;
+#ifdef TARGET_N64
+    char fpath[64];
+    int bLoaded;
+#endif
     rdGeoset geosets[4];
     uint32_t numGeosets;
     rdMaterial** materials;
@@ -204,6 +208,7 @@ rdHierarchyNode* rdModel3_FindNamedNode(char *name, rdModel3 *model);
 MATH_FUNC int rdModel3_GetMeshMatrix(rdThing *thing, rdMatrix34 *matrix, uint32_t nodeIdx, rdMatrix34 *out);
 MATH_FUNC int rdModel3_ReplaceMesh(rdModel3 *model, int geosetIdx, int meshIdx, rdMesh *in);
 MATH_FUNC int rdModel3_Draw(rdThing *thing, rdMatrix34 *matrix_4_3);
+int rdModel3_EnsureLoaded(rdModel3 *model);
 MATH_FUNC void rdModel3_DrawHNode(rdHierarchyNode *pNode);
 MATH_FUNC void rdModel3_DrawMesh(rdMesh *meshIn, rdMatrix34 *mat);
 MATH_FUNC FAST_FUNC int rdModel3_DrawFace(rdFace *face, int lightFlags);

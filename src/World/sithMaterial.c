@@ -1,4 +1,7 @@
 #include "sithMaterial.h"
+#ifdef TARGET_N64
+#include <libdragon.h>
+#endif
 
 #include "General/stdHashTable.h"
 #include "General/stdString.h"
@@ -152,6 +155,14 @@ rdMaterial* sithMaterial_LoadEntry(const char *a1, int create_ddraw_surface, int
         result = (rdMaterial *)stdHashTable_GetKeyVal(sithMaterial_hashmap, a1);
         if ( result )
             return result;
+#ifdef TARGET_N64
+        if ( !v4 ) {
+            debugf("[N64] sithMaterial_LoadEntry: pLoading=NULL for '%s' (option 1/2)\n", a1);
+            return 0;
+        }
+        debugf("[N64] sithMaterial_LoadEntry: '%s' loaded=%d/%d\n",
+               a1, v4->numMaterialsLoaded, v4->numMaterials);
+#endif
         v6 = v4->numMaterialsLoaded;
         if ( v6 >= v4->numMaterials )
             return 0;

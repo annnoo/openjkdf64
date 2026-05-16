@@ -6,6 +6,7 @@
 #include "Win95/Window.h"
 #include "Win95/Video.h"
 #include "Win95/stdDisplay.h"
+#include "Engine/sithCamera.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -114,7 +115,7 @@ void Window_GetDrawHandlers(WindowDrawHandler_t *drawAndFlip, WindowDrawHandler_
 
 // ── Video (display device management — stubbed, handled by stdDisplay_N64) ───
 
-int  Video_Startup()        { return 1; }
+int  Video_Startup()        { sithCamera_Startup(); return 1; }
 void Video_Shutdown()       {}
 void Video_SwitchToGDI()    {}
 int  Video_camera_related() { return 1; }

@@ -17,11 +17,11 @@
  */
 int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
 {
-    FILE *fp;
+    stdFile_t fp;
     BcogHeader hdr;
     uint32_t i;
 
-    fp = fopen(bcog_fpath, "rb");
+    fp = pSithHS->fileOpen(bcog_fpath, "rb");
     if (!fp)
     {
         stdPrintf(pSithHS->errorPrint, ".\\Cog\\sithCogBinary.c", __LINE__,
@@ -30,7 +30,7 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
     }
 
     /* --- header --- */
-    if (fread(&hdr, sizeof(hdr), 1, fp) != 1)
+    if (pSithHS->fileRead(fp, &hdr, sizeof(hdr)) != sizeof(hdr))
         goto fail;
 
     if (memcmp(hdr.magic, BCOG_MAGIC, 4) != 0 || hdr.version != BCOG_VERSION)
@@ -57,8 +57,9 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
             sithCogSymbol *sym;
             char *nameBuf;
 
-            if (fread(&bs, sizeof(bs), 1, fp) != 1)
+            if (pSithHS->fileRead(fp, &bs, sizeof(bs)) != sizeof(bs))
                 goto fail;
+// ... (rest of function)
 
             sym = &table->buckets[i];
             sym->symbol_id    = bs.symbol_id;
@@ -100,7 +101,7 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
         for (i = 0; i < hdr.num_triggers; i++)
         {
             BcogTrigger bt;
-            if (fread(&bt, sizeof(bt), 1, fp) != 1)
+            if (pSithHS->fileRead(fp, &bt, sizeof(bt)) != sizeof(bt))
                 goto fail;
 
 #ifdef COG_DYNAMIC_TRIGGERS
@@ -136,7 +137,7 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
             BcogIdk bi;
             sithCogReference *ref;
 
-            if (fread(&bi, sizeof(bi), 1, fp) != 1)
+            if (pSithHS->fileRead(fp, &bi, sizeof(bi)) != sizeof(bi))
                 goto fail;
 
 #ifdef COG_DYNAMIC_IDK
@@ -174,15 +175,15 @@ int sithCogBinary_Load(const char *bcog_fpath, sithCogScript *script)
         script->script_program = (int32_t *)pSithHS->alloc(sizeof(int32_t) * hdr.code_size);
         if (!script->script_program)
             goto fail;
-        if (fread(script->script_program, sizeof(int32_t), hdr.code_size, fp) != hdr.code_size)
+        if (pSithHS->fileRead(fp, script->script_program, sizeof(int32_t) * hdr.code_size) != sizeof(int32_t) * hdr.code_size)
             goto fail;
         script->codeSize = hdr.code_size;
     }
 
-    fclose(fp);
+    pSithHS->fileClose(fp);
     return 1;
 
 fail:
-    fclose(fp);
+    if (fp) pSithHS->fileClose(fp);
     return 0;
 }

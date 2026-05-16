@@ -75,18 +75,18 @@ int rdColormap_LoadEntry(char *colormap_fname, rdColormap *colormap)
     header.magic = le32_to_cpu(header.magic);
     header.version = le32_to_cpu(header.version);
     header.flags = le32_to_cpu(header.flags);
-    header.tint[0] = le32_to_cpu(header.tint[0]);
-    header.tint[1] = le32_to_cpu(header.tint[1]);
-    header.tint[2] = le32_to_cpu(header.tint[2]);
+    header.tint[0] = lef32_to_cpu(header.tint[0]);
+    header.tint[1] = lef32_to_cpu(header.tint[1]);
+    header.tint[2] = lef32_to_cpu(header.tint[2]);
 
     colormap->tint.x = header.tint[0];
     colormap->flags = header.flags;
     colormap->tint.y = header.tint[1];
     colormap->tint.z = header.tint[2];
 
-    if ( header.magic != 0x504D4320 ) // "CMP " in Little-Endian
+    if ( header.magic != 0x434D5020 ) // "CMP " in Big-Endian
     {
-        jk_printf("CMP magic in `%s` is invalid!\n", colormap_fname);
+        jk_printf("CMP magic in `%s` is invalid! (expected 0x434D5020, got 0x%08x)\n", colormap_fname, (unsigned int)header.magic);
         goto safe_fallback;
     }
     rdroid_pHS->fileRead(colormap_fptr, colormap->colors, 0x300);

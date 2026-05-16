@@ -908,13 +908,17 @@ char __tolower(char a)
 
 int msvc_sub_512D30(int a, int b)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
 int jk_MessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
@@ -926,12 +930,16 @@ int stdGdi_GetHwnd()
 
 void jk_PostMessageA()
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 void jk_GetCursorPos(LPPOINT lpPoint)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 int jk_GetUpdateRect(HWND hWnd, LPRECT lpRect, BOOL bErase)
@@ -941,7 +949,9 @@ int jk_GetUpdateRect(HWND hWnd, LPRECT lpRect, BOOL bErase)
 
 void jk_BeginPaint(int a, struct tagPAINTSTRUCT * lpPaint)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 int jk_vsnwprintf(wchar_t * a, size_t b, const wchar_t *fmt, va_list list)
@@ -957,45 +967,61 @@ int jk_vsnwprintf(wchar_t * a, size_t b, const wchar_t *fmt, va_list list)
 
 void jk_EndPaint(HWND hWnd, const PAINTSTRUCT *lpPaint)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 HINSTANCE stdGdi_GetHInstance()
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
 int jk_LoadCursorA(HINSTANCE hInstance, LPCSTR lpCursorName)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 1;
 }
 
 void jk_SetCursor(HCURSOR hCursor)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 void jk_InvalidateRect(HWND hWnd, const RECT *lpRect, BOOL bErase)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 void jk_ChangeDisplaySettingsA(int a, int b)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 uint32_t jk_DirectDrawEnumerateA(void* a, void** b)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
 uint32_t jk_DirectDrawCreate(GUID *lpGUID, LPDIRECTDRAW *lplpDD, IUnknown *pUnkOuter)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
@@ -1053,19 +1079,26 @@ void jk_CloseHandle(HANDLE hObject)
 
 uint32_t jk_GetDesktopWindow()
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
 uint32_t jk_GetDC(HWND hWnd)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
     return 0;
 }
 
 uint32_t jk_GetDeviceCaps(HDC hdc, int index)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
+    if (index == 12) return 16; // BITSPIXEL
     return 0;
 }
 
@@ -1082,7 +1115,9 @@ int _string_modify_idk(int c)
 
 void jk_ReleaseDC(HWND hWnd, HDC hDC)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 void jk_SetFocus(HWND hWnd)
@@ -1092,7 +1127,9 @@ void jk_SetFocus(HWND hWnd)
 
 void jk_SetActiveWindow(HWND hWnd)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 void jk_ShowCursor(int a)
@@ -1103,7 +1140,9 @@ void jk_ShowCursor(int a)
 
 void jk_ValidateRect(HWND hWnd, const RECT *lpRect)
 {
+#ifndef TARGET_N64
     assert(0);
+#endif
 }
 
 #if !defined(ARCH_WASM)

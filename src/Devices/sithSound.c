@@ -161,11 +161,13 @@ sithSound* sithSound_LoadEntry(char *sound_fname, int a2)
     sound = (sithSound *)stdHashTable_GetKeyVal(sithSound_hashtable, sound_fname);
     if ( sound )
     {
+#ifndef TARGET_N64
         if ( a2 && (sound->isLoaded & 1) == 0 )
         {
             sithSound_LoadFileData(sound);
             return sound;
         }
+#endif
         return sound;
     }
 

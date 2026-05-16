@@ -59,7 +59,9 @@ int rdKeyframe_LoadEntry(char *key_fpath, rdKeyframe *keyframe)
     rdJoint *paJoints;
     rdKeyframe *num_joints;
     unsigned int num_markers_read;
+#ifndef TARGET_N64
     rdMarkers *markers;
+#endif
     rdJoint *joint;
     rdAnimEntry *anim_entry;
     int anim_entry_read;
@@ -76,7 +78,20 @@ int rdKeyframe_LoadEntry(char *key_fpath, rdKeyframe *keyframe)
     unsigned int nodes_read;
     flex32_t ftmp;
 
+    int prevId = keyframe->id;
+#ifdef TARGET_N64
+    char prevFpath[64];
+    stdString_SafeStrCopy(prevFpath, keyframe->fpath, sizeof(prevFpath));
+#endif
+
     rdKeyframe_NewEntry(keyframe);
+
+    // Restore preserved fields
+    keyframe->id = prevId;
+#ifdef TARGET_N64
+    stdString_SafeStrCopy(keyframe->fpath, prevFpath, sizeof(keyframe->fpath));
+#endif
+
     key_fname_only = stdFileFromPath(key_fpath);
 #ifdef SITH_DEBUG_STRUCT_NAMES
     stdString_SafeStrCopy(keyframe->name, key_fname_only, 32);
@@ -84,111 +99,154 @@ int rdKeyframe_LoadEntry(char *key_fpath, rdKeyframe *keyframe)
 #ifdef STDHASHTABLE_CRC32_KEYS
     keyframe->namecrc = stdCrc32(key_fname_only, strlen(key_fname_only));
 #endif
+#ifdef TARGET_N64
+    stdString_SafeStrCopy(keyframe->fpath, key_fpath, sizeof(keyframe->fpath));
+#endif
+
     if (!stdConffile_OpenRead(key_fpath)) {
-        stdPrintf(pSithHS->errorPrint, ".\\Engine\\rdKeyframe.c", 0, "OpenJKDF2: Failed to open keyframe file `%s`\n", key_fpath);
+        stdPlatform_Printf("rdKeyframe_LoadEntry: Failed to open keyframe file `%s`\n", key_fpath);
         goto open_fail;
     }
 
-    if (!stdConffile_ReadLine())
+    if (!stdConffile_ReadLine()) {
+      stdPlatform_Printf("rdKeyframe_LoadEntry: ReadLine failed at start of `%s`\n", key_fpath);
       goto read_fail;
+    }
 
-    if (_sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1)
+    if (_sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1) {
+      stdPlatform_Printf("rdKeyframe_LoadEntry: Section header missing in `%s`: '%s'\n", key_fpath, stdConffile_aLine);
       goto read_fail;
+    }
 
-    if (!stdConffile_ReadLine())
-      goto read_fail;
+    if (!__strcmpi(std_genBuffer, "header"))
+    {
+        if (!stdConffile_ReadLine())
+            goto read_fail;
 
-    if (_sscanf(stdConffile_aLine, " flags %d", &keyframe->flags) != 1)
-      goto read_fail;
+        if (_sscanf(stdConffile_aLine, " flags %d", &keyframe->flags) != 1) {
+            stdPlatform_Printf("rdKeyframe_LoadEntry: Failed to parse 'flags' in `%s`\n", key_fpath);
+            goto read_fail;
+        }
 
-    if (!stdConffile_ReadLine())
-      goto read_fail;
+        if (!stdConffile_ReadLine())
+            goto read_fail;
 
-    if (_sscanf(stdConffile_aLine, " type %x", &keyframe->type) != 1)
-      goto read_fail;
+        if (_sscanf(stdConffile_aLine, " type %x", &keyframe->type) != 1) {
+            stdPlatform_Printf("rdKeyframe_LoadEntry: Failed to parse 'type' in `%s`\n", key_fpath);
+            goto read_fail;
+        }
 
-    if (!stdConffile_ReadLine())
-      goto read_fail;
+        if (!stdConffile_ReadLine())
+            goto read_fail;
 
-    if (_sscanf(stdConffile_aLine, " frames %d", &keyframe->numFrames) != 1)
-      goto read_fail;
+        if (_sscanf(stdConffile_aLine, " frames %d", &keyframe->numFrames) != 1)
+            goto read_fail;
 
-    if (!stdConffile_ReadLine())
-      goto read_fail;
+        if (!stdConffile_ReadLine())
+            goto read_fail;
 
-    if (_sscanf(stdConffile_aLine, " fps %f", &ftmp) != 1)
-      goto read_fail;
-    keyframe->fps = ftmp; // FLEXTODO
+        if (_sscanf(stdConffile_aLine, " fps %f", &keyframe->fps) != 1) // FLEXTODO
+            goto read_fail;
 
-    if (!stdConffile_ReadLine())
-      goto read_fail;
+        if (!stdConffile_ReadLine())
+            goto read_fail;
 
-    if (_sscanf(stdConffile_aLine, " joints %d", &keyframe->numJoints) != 1)
-      goto read_fail;
+        if (_sscanf(stdConffile_aLine, " joints %d", &keyframe->numJoints) != 1)
+            goto read_fail;
 
-    paJoints = (rdJoint *)rdroid_pHS->alloc(sizeof(rdJoint) * (keyframe->numJoints+1)); // Added: try and contain rdPuppet crashes...
-    keyframe->paJoints = paJoints;
-    if (!paJoints)
-      goto read_fail;
+        if (!stdConffile_ReadLine())
+            goto read_fail;
 
-    _memset(paJoints, 0, sizeof(rdJoint) * (keyframe->numJoints+1));
+        if (_sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1)
+            goto read_fail;
+    }
+
+#ifndef TARGET_N64
+    if (!__strcmpi(std_genBuffer, "markers"))
+    {
+        if (!stdConffile_ReadLine())
+            goto read_fail;
+
+        if (_sscanf(stdConffile_aLine, " markers %d", &keyframe->numMarkers) != 1)
+            goto read_fail;
+
+        for (num_markers_read = 0; num_markers_read < keyframe->numMarkers; num_markers_read++)
+        {
+            if (!stdConffile_ReadLine())
+                goto read_fail;
+
+            if (_sscanf(stdConffile_aLine, " %f %d", &ftmp, &keyframe->markers.marker_int[num_markers_read]) != 2) // FLEXTODO
+                goto read_fail;
+            
+            keyframe->markers.marker_float[num_markers_read] = ftmp;
+        }
+
+        if (!stdConffile_ReadLine())
+            goto read_fail;
+
+        if (_sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1)
+            goto read_fail;
+    }
+#else
+    if (!__strcmpi(std_genBuffer, "markers"))
+    {
+        if (!stdConffile_ReadLine())
+            goto read_fail;
+
+        if (_sscanf(stdConffile_aLine, " markers %d", &anim_entry_cnt) != 1)
+            goto read_fail;
+
+        for (num_markers_read = 0; num_markers_read < anim_entry_cnt; num_markers_read++)
+        {
+            if (!stdConffile_ReadLine())
+                goto read_fail;
+        }
+
+        if (!stdConffile_ReadLine())
+            goto read_fail;
+
+        if (_sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1)
+            goto read_fail;
+    }
+#endif
+
+#ifdef TARGET_N64
+    // Short circuit for lazy loading on N64
+    // We only load if we are NOT in the initial level load.
+    // If we ARE in level load, we just store the metadata.
+    if (sithWorld_pLoading) {
+        keyframe->bLoaded = 0;
+        keyframe->paJoints = NULL;
+        stdConffile_Close();
+        return 1;
+    }
+#endif
+
+    if (__strcmpi(std_genBuffer, "keyframes"))
+        goto read_fail;
+
     keyframe->numJoints2 = keyframe->numJoints;
+    keyframe->paJoints = (rdJoint*)rdroid_pHS->alloc(sizeof(rdJoint) * keyframe->numJoints);
+    if (!keyframe->paJoints)
+        goto read_fail;
 
-    if (!stdConffile_ReadLine() || _sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1)
-      goto read_fail;
-
-    if (!_memcmp(std_genBuffer, "markers", 8u))
+    _memset(keyframe->paJoints, 0, sizeof(rdJoint) * keyframe->numJoints);
+    for (nodes_read = 0; nodes_read < keyframe->numJoints2; nodes_read++)
     {
-      if (!stdConffile_ReadLine())
-        goto read_fail;
-
-      if (_sscanf(stdConffile_aLine, " markers %d", &num_markers) != 1)
-        goto read_fail;
-
-      if (num_markers > 8)
-        goto read_fail;
-
-      keyframe->numMarkers = num_markers;
-      for (num_markers_read = 0; num_markers_read < num_markers; num_markers_read++)
-      {
-        markers = &keyframe->markers;
-        if (!stdConffile_ReadLine())
-            break;
-        
-        if (_sscanf(stdConffile_aLine, "%f %d", &ftmp, &markers->marker_int[num_markers_read]) != 2)
-            break;
-        markers->marker_float[num_markers_read] = ftmp;
-      }
-      
-      if (num_markers_read < num_markers)
-            goto read_fail;
-
-      if (!stdConffile_ReadLine())
-        goto read_fail;
-
-      if (_sscanf(stdConffile_aLine, " section: %s", std_genBuffer) != 1)
-        goto read_fail;
-    }
-    
-    
-    if (!stdConffile_ReadLine() || _sscanf(stdConffile_aLine, " nodes %d", &num_nodes) != 1)
-    {
-      goto read_fail;
-    }
-
-    for (nodes_read = 0; nodes_read < num_nodes; nodes_read++)
-    {
+        joint = &keyframe->paJoints[nodes_read];
         if (!stdConffile_ReadLine())
             goto read_fail;
+
         if (_sscanf(stdConffile_aLine, " node %d", &node_idx) != 1)
             goto read_fail;
+
+#ifdef SITH_DEBUG_STRUCT_NAMES
         if (!stdConffile_ReadLine())
             goto read_fail;
-        if (_sscanf(stdConffile_aLine, " mesh name %s", mesh_name) != 1)
+
+        if (_sscanf(stdConffile_aLine, " mesh %s", mesh_name) != 1)
             goto read_fail;
-        joint = &keyframe->paJoints[node_idx];
-        
-#ifdef SITH_DEBUG_STRUCT_NAMES
+
         stdString_SafeStrCopy(joint->mesh_name, mesh_name, 32);
 #endif
         
@@ -240,16 +298,21 @@ int rdKeyframe_LoadEntry(char *key_fpath, rdKeyframe *keyframe)
               goto read_fail;
             }
 
+#ifndef TARGET_N64
             anim_entry->vel.x = velx; // FLEXTODO
             anim_entry->vel.y = vely; // FLEXTODO
             anim_entry->vel.z = velz; // FLEXTODO
             anim_entry->angVel.x = angVelx; // FLEXTODO
             anim_entry->angVel.y = angVely; // FLEXTODO
             anim_entry->angVel.z = angVelz; // FLEXTODO
+#endif
             anim_entry++;
         }
     }
     
+#ifdef TARGET_N64
+    keyframe->bLoaded = 1;
+#endif
     stdConffile_Close();
     return 1;
   
@@ -280,6 +343,7 @@ int rdKeyframe_Write(char *out_fpath, rdKeyframe *keyframe, char *creation_metho
     rdroid_pHS->filePrintf(fd, "FRAMES %d\n", keyframe->numFrames);
     rdroid_pHS->filePrintf(fd, "FPS    %.3f\n", keyframe->fps);
     rdroid_pHS->filePrintf(fd, "JOINTS %d\n", keyframe->numJoints);
+#ifndef TARGET_N64
     if (keyframe->numMarkers)
     {
         rdroid_pHS->filePrintf(fd, "\n\n");
@@ -291,43 +355,24 @@ int rdKeyframe_Write(char *out_fpath, rdKeyframe *keyframe, char *creation_metho
             rdroid_pHS->filePrintf(fd, "%f %d\n", keyframe->markers.marker_float[i], keyframe->markers.marker_int[i]);
         }
     }
-    
+#endif
     rdroid_pHS->filePrintf(fd, "\n\n");
     rdroid_pHS->filePrintf(fd, "###############\n");
-    rdroid_pHS->filePrintf(fd, "SECTION: KEYFRAME NODES\n\n");
-    totalAnimEntries = 0;
-    for (i = 0; i < keyframe->numJoints2; i++)
-    {
-        if (keyframe->paJoints[i].numAnimEntries)
-            ++totalAnimEntries;
-    }
-    rdroid_pHS->filePrintf(fd, "NODES %d\n\n", totalAnimEntries);
+    rdroid_pHS->filePrintf(fd, "SECTION: KEYFRAMES\n\n");
     joint_iter = keyframe->paJoints;
-    for (i = 0; i < keyframe->numJoints2; i++, joint_iter++)
+    for (i = 0; i < keyframe->numJoints; i++)
     {
-        if (!joint_iter->numAnimEntries)
-            continue;
-
-        rdroid_pHS->filePrintf(fd, "NODE    %d\n", i);
+        rdroid_pHS->filePrintf(fd, "NODE %d\n", joint_iter->nodeIdx);
 #ifdef SITH_DEBUG_STRUCT_NAMES
-        rdroid_pHS->filePrintf(fd, "MESH NAME %s\n", joint_iter->mesh_name);
-#else
-        rdroid_pHS->filePrintf(fd, "MESH NAME %s\n", "UNKNOWN");
+        rdroid_pHS->filePrintf(fd, "MESH %s\n", joint_iter->mesh_name);
 #endif
         rdroid_pHS->filePrintf(fd, "ENTRIES %d\n", joint_iter->numAnimEntries);
-        rdroid_pHS->filePrintf(fd, "\n");
-        rdroid_pHS->filePrintf(
-        fd,
-        "# num:   frame:   flags:           x:           y:           z:           p:           y:           r:\n");
-        rdroid_pHS->filePrintf(
-        fd,
-        "#                                 dx:          dy:          dz:          dp:          dy:          dr:\n");
         animEntry_iter = joint_iter->paAnimEntries;
-        for (j = 0; j < joint_iter->numAnimEntries; j++ )
+        for (j = 0; j < joint_iter->numAnimEntries; j++)
         {
             rdroid_pHS->filePrintf(
                 fd,
-                " %3d:  %7d   0x%04x %12.8f %12.8f %12.8f %12.8f %12.8f %12.8f\n",
+                "%d: %f 0x%x %f %f %f %f %f %f\n",
                 j,
                 animEntry_iter->frameNum,
                 animEntry_iter->flags,
@@ -337,23 +382,50 @@ int rdKeyframe_Write(char *out_fpath, rdKeyframe *keyframe, char *creation_metho
                 animEntry_iter->orientation.x,
                 animEntry_iter->orientation.y,
                 animEntry_iter->orientation.z);
-
+#ifndef TARGET_N64
             rdroid_pHS->filePrintf(
                 fd,
-                " %35.8f %12.8f %12.8f %12.8f %12.8f %12.8f\n",
+                "%f %f %f %f %f %f\n",
                 animEntry_iter->vel.x,
                 animEntry_iter->vel.y,
                 animEntry_iter->vel.z,
                 animEntry_iter->angVel.x,
                 animEntry_iter->angVel.y,
                 animEntry_iter->angVel.z);
-            ++animEntry_iter;
+#else
+            rdroid_pHS->filePrintf(fd, "0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\n");
+#endif
+            animEntry_iter++;
         }
-        rdroid_pHS->filePrintf(fd, "\n");
+        joint_iter++;
     }
     rdroid_pHS->fileClose(fd);
-    
     return 1;
+}
+
+void rdKeyframe_FreeJoints(rdKeyframe *keyframe)
+{
+    rdJoint *joint_iter;
+    unsigned int i;
+
+    if (!keyframe)
+        return;
+
+    if (keyframe->paJoints)
+    {
+        joint_iter = keyframe->paJoints;
+        for (i = 0; i < keyframe->numJoints; i++)
+        {
+            if (joint_iter->paAnimEntries)
+            {
+                rdroid_pHS->free(joint_iter->paAnimEntries);
+                joint_iter->paAnimEntries = NULL;
+            }
+            joint_iter++;
+        }
+        rdroid_pHS->free(keyframe->paJoints);
+        keyframe->paJoints = NULL;
+    }
 }
 
 void rdKeyframe_FreeEntry(rdKeyframe *keyframe)
@@ -366,31 +438,24 @@ void rdKeyframe_FreeEntry(rdKeyframe *keyframe)
         pKeyframeUnloader(keyframe);
         return;
     }
-    
-    // This was inlined
+
     rdKeyframe_FreeJoints(keyframe);
-    
-    rdroid_pHS->free(keyframe);
 }
 
-void rdKeyframe_FreeJoints(rdKeyframe *keyframe)
+#ifdef TARGET_N64
+int rdKeyframe_EnsureLoaded(rdKeyframe *keyframe)
 {
-    unsigned int i;
-    rdJoint* joint_iter;
+    if (!keyframe || keyframe->bLoaded) return 1;
     
-    if (!keyframe->paJoints)
-        return;
-
-    joint_iter = keyframe->paJoints;
-    for (i = 0; i < keyframe->numJoints2; i++)
-    {
-        if (joint_iter->paAnimEntries)
-        {
-            rdroid_pHS->free(joint_iter->paAnimEntries);
-            joint_iter->paAnimEntries = NULL;
-        }
-        joint_iter++;
-    }
-    rdroid_pHS->free(keyframe->paJoints);
-    keyframe->paJoints = NULL;
+    // stdPlatform_Printf("Lazy loading keyframe: %s\n", keyframe->fpath);
+    
+    // Save current loading world temporarily to avoid short-circuit
+    sithWorld* prevLoading = sithWorld_pLoading;
+    sithWorld_pLoading = NULL;
+    
+    int ret = rdKeyframe_LoadEntry(keyframe->fpath, keyframe);
+    
+    sithWorld_pLoading = prevLoading;
+    return ret;
 }
+#endif

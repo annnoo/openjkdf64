@@ -98,7 +98,7 @@ void jkHudInv_ClearRects()
     }
     if ( jkHudInv_info.field_28 )
     {
-        if ( Video_pCanvas->heightMinusOne < jkHudInv_info.field_3C )
+        if ( Video_pCanvas && Video_pCanvas->heightMinusOne < jkHudInv_info.field_3C )
         {
             stdDisplay_VBufferFill(Video_pMenuBuffer, Video_fillColor, &jkHudInv_info.drawRect);
             --jkHudInv_info.field_28;

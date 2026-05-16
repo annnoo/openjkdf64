@@ -27,7 +27,11 @@ void sithRenderSky_Close()
 
 void sithRenderSky_Update()
 {
-    sithSector_flt_8553C0 = sithSector_horizontalDist / rdCamera_pCurCamera->fovDx;
+    if (rdCamera_pCurCamera->fovDx != 0.0) {
+        sithSector_flt_8553C0 = sithSector_horizontalDist / rdCamera_pCurCamera->fovDx;
+    } else {
+        sithSector_flt_8553C0 = 0.0;
+    }
     stdMath_SinCos(sithCamera_currentCamera->viewPYR.z, &sithSector_flt_8553F4, &sithSector_flt_8553C8);
     sithSector_flt_8553B8 = -(sithCamera_currentCamera->viewPYR.y * sithSector_horizontalPixelsPerRev_idk);
     sithSector_flt_8553C4 = -(sithCamera_currentCamera->viewPYR.x * sithSector_horizontalPixelsPerRev_idk);

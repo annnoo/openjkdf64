@@ -65,7 +65,7 @@ void rdCamera_AdvanceFrame();
 flex_t rdCamera_GetMipmapScalar(); // MOTS added
 void rdCamera_SetMipmapScalar(flex_t val); // MOTS added
 
-#ifdef TARGET_TWL
+#if defined(TARGET_TWL) || defined(TARGET_N64)
 MATH_FUNC FAST_FUNC void rdCamera_PerspProjectClip(rdVector3 *vertices_out, const rdVector3 *vertices_in); // Added
 MATH_FUNC FAST_FUNC void rdCamera_PerspProjectLstClip(rdVector3 *vertices_out, const rdVector3 *vertices_in, unsigned int num_vertices); // Added
 #endif
