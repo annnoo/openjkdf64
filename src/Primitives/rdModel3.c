@@ -15,6 +15,11 @@
 #include "Primitives/rdPrimit3.h"
 #include "Primitives/rdDebug.h"
 
+#ifdef TARGET_N64
+#include <t3d/t3d.h>
+#include <t3d/t3dmath.h>
+#endif
+
 model3Loader_t rdModel3_RegisterLoader(model3Loader_t loader)
 {
     model3Loader_t result = pModel3Loader;
@@ -498,9 +503,43 @@ int rdModel3_Load(char *model_fpath, rdModel3 *model)
 
     rdModel3_CalcNumParents(model); // MOTS added
 
+    #ifdef TARGET_N64
+    for (int g = 0; g < model->numGeosets; g++) {
+        rdGeoset *geoset = &model->geosets[g];
+        for (int m = 0; m < geoset->numMeshes; m++) {
+            rdMesh *mesh = &geoset->meshes[m];
+            mesh->n64_vertices = malloc(mesh->numVertices * sizeof(T3DVertPacked));
+            T3DVertPacked *n64_verts = (T3DVertPacked*)mesh->n64_vertices;
+            for (int i = 0; i < mesh->numVertices; i++) {
+                n64_verts[i].pos[0] = (s16)mesh->vertices[i].x;
+                n64_verts[i].pos[1] = (s16)mesh->vertices[i].y;
+                n64_verts[i].pos[2] = (s16)mesh->vertices[i].z;
+
+                if (mesh->vertexUVs) {
+                    n64_verts[i].uv[0] = (s16)(mesh->vertexUVs[i].x * 1024.0f);
+                    n64_verts[i].uv[1] = (s16)(mesh->vertexUVs[i].y * 1024.0f);
+                } else {
+                    n64_verts[i].uv[0] = 0;
+                    n64_verts[i].uv[1] = 0;
+                }
+
+                if (mesh->vertexNormals) {
+                    n64_verts[i].norm[0] = (s8)(mesh->vertexNormals[i].x * 127.0f);
+                    n64_verts[i].norm[1] = (s8)(mesh->vertexNormals[i].y * 127.0f);
+                    n64_verts[i].norm[2] = (s8)(mesh->vertexNormals[i].z * 127.0f);
+                } else {
+                    n64_verts[i].norm[0] = 0;
+                    n64_verts[i].norm[1] = 0;
+                    n64_verts[i].norm[2] = 127;
+                }
+            }
+        }
+    }
+    #endif
+
     stdConffile_Close();
     return 1;
-
+    }
 fail:
 #ifdef STDPLATFORM_HEAP_SUGGESTIONS
     pSithHS->suggestHeap(HEAP_ANY);
@@ -787,6 +826,12 @@ void rdModel3_FreeEntry(rdModel3 *model)
                 rdroid_pHS->free(mesh->vertices_unk);
             if (mesh->vertexNormals)
                 rdroid_pHS->free(mesh->vertexNormals);
+#ifdef TARGET_N64
+            if (mesh->n64_vertices)
+                free(mesh->n64_vertices);
+            if (mesh->n64_block)
+                rspq_block_free(mesh->n64_block);
+#endif
         }
         if ( geoset->meshes )
             rdroid_pHS->free(geoset->meshes);
@@ -1292,6 +1337,36 @@ void rdModel3_DrawHNode(rdHierarchyNode *pNode)
 // MOTS altered (RGB lights)
 void rdModel3_DrawMesh(rdMesh *meshIn, rdMatrix34 *mat)
 {
+#ifdef TARGET_N64
+    // N64 Fast path: Use pre-recorded blocks and RSP transformation
+    // Fallback to slow path if mesh is too large for the RSP vertex buffer (~80 verts)
+    if (meshIn->n64_vertices && meshIn->numVertices <= 64) {
+        if (!meshIn->n64_block) {
+            rspq_block_begin();
+            t3d_vert_load(meshIn->n64_vertices, 0, meshIn->numVertices);
+            for (int i = 0; i < meshIn->numFaces; i++) {
+                rdFace *f = &meshIn->faces[i];
+                for (int j = 1; j < f->numVertices - 1; j++) {
+                    t3d_tri_draw(f->vertexPosIdx[0], f->vertexPosIdx[j], f->vertexPosIdx[j+1]);
+                }
+            }
+            meshIn->n64_block = rspq_block_end();
+        }
+
+        T3DMat4 t3d_mat;
+        float m[4][4];
+        m[0][0] = mat->rvec.x; m[0][1] = mat->rvec.y; m[0][2] = mat->rvec.z; m[0][3] = mat->scale.x;
+        m[1][0] = mat->lvec.x; m[1][1] = mat->lvec.y; m[1][2] = mat->lvec.z; m[1][3] = mat->scale.y;
+        m[2][0] = mat->uvec.x; m[2][1] = mat->uvec.y; m[2][2] = mat->uvec.z; m[2][3] = mat->scale.z;
+        m[3][0] = 0.0f;        m[3][1] = 0.0f;        m[3][2] = 0.0f;        m[3][3] = 1.0f;
+
+        t3d_mat4_to_fixed(&t3d_mat, (float(*)[4])m);
+        t3d_matrix_push(&t3d_mat);
+        rspq_block_run(meshIn->n64_block);
+        t3d_matrix_pop(1);
+        return;
+    }
+#endif
     rdLight **pGeoLight;
     rdVector3 vertex;
     rdMatrix34 matInv;
